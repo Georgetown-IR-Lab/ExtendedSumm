@@ -255,7 +255,7 @@ class Trainer(object):
                 paper_id = batch.paper_id[0]
                 paper_src = batch.src_str
                 paper_tgt = batch.tgt_str
-
+                #new branch
                 if paper_id not in sent_scores_whole.keys():
                     sent_scores_whole[paper_id] = []
                     paper_srcs[paper_id] = []
