@@ -239,14 +239,9 @@ class Trainer(object):
         sent_scores_whole = {}
         paper_srcs = {}
         paper_tgts = {}
-        sent_labels ={}
         with torch.no_grad():
             for batch in test_iter:
                 src = batch.src
-                # if batch.src_str in srcs:
-                #     import pdb;pdb.set_trace()
-                # else:
-                #     srcs.append(batch.src_str)
                 labels = batch.src_sent_labels
                 segs = batch.segs
                 clss = batch.clss
@@ -255,7 +250,7 @@ class Trainer(object):
                 paper_id = batch.paper_id[0]
                 paper_src = batch.src_str
                 paper_tgt = batch.tgt_str
-                #new branch
+
                 if paper_id not in sent_scores_whole.keys():
                     sent_scores_whole[paper_id] = []
                     paper_srcs[paper_id] = []
@@ -279,49 +274,47 @@ class Trainer(object):
 
                     sent_scores = sent_scores + mask.float()
                     sent_scores = sent_scores.cpu().data.numpy()
-                    sent_scores_whole[paper_id].extend(sent_scores[0])
-                    paper_srcs[paper_id].extend(paper_src[0])
-                    paper_tgts[paper_id].extend(paper_tgt)
+                    selected_ids = np.argsort(-sent_scores, 1)
+                    # selected_ids = np.sort(selected_ids,1)
+                    for i, idx in enumerate(selected_ids):
+                        _pred = []
+                        if (len(batch.src_str[i]) == 0):
+                            continue
+                        for j in selected_ids[i][:len(batch.src_str[i])]:
+                            if (j >= len(batch.src_str[i])):
+                                continue
+                            candidate = batch.src_str[i][j].strip()
+                            if (self.args.block_trigram):
+                                if (not _block_tri(candidate, _pred)):
+                                    _pred.append(candidate)
+                            else:
+                                _pred.append(candidate)
 
-        for paper_id, sent_scores in sent_scores_whole.items():
-            selected_ids = np.argsort(sent_scores, 0)[::-1]
-            # selected_ids = np.sort(selected_ids,1)
-            for i, idx in enumerate(selected_ids):
-                _pred = []
-                if (len(paper_srcs[paper_id][i]) == 0):
-                    continue
-                for j in selected_ids[:len(paper_srcs[paper_id])]:
-                    if (j >= len(paper_srcs[paper_id][i])):
-                        continue
-                    candidate = paper_srcs[paper_id][j].strip()
-                    if (self.args.block_trigram):
-                        if (not _block_tri(candidate, _pred)):
-                            _pred.append(candidate)
-                    else:
-                        _pred.append(candidate)
+                            if ((not cal_oracle) and (not self.args.recall_eval) and len(_pred) == 3):
+                                break
 
-                    if ((not cal_oracle) and (not self.args.recall_eval) and len(_pred) == 3):
-                        break
+                        _pred = '<q>'.join(_pred)
+                        if (self.args.recall_eval):
+                            _pred = ' '.join(_pred.split()[:len(paper_tgt.split())])
 
-                _pred = '<q>'.join(_pred)
-                if (self.args.recall_eval):
-                    _pred = ' '.join(_pred.split()[:len(paper_tgts[paper_id].split())])
+                        # pred.append(_pred)
+                        try:
+                            if paper_id in preds.keys():
+                                preds[paper_id] += _pred + ' '
+                            else:
+                                preds[paper_id] = _pred + ' '
+                        except:
+                            import pdb;
+                            pdb.set_trace()
+                        golds[paper_id] = paper_tgt[0]
 
-                # pred.append(_pred)
-                try:
-                    if paper_id in preds.keys():
-                        preds[paper_id] += _pred + ' '
-                    else:
-                        preds[paper_id] = _pred + ' '
-                except:
-                    import pdb;pdb.set_trace()
-                golds[paper_id] = paper_tgts[paper_id]
-
-                # gold.append(batch.tgt_str[i])
-        import pdb;pdb.set_trace()
+                    # gold.append(batch.tgt_str[i])
         for id, pred in preds.items():
             save_pred.write(pred.strip() + '\n')
-            save_gold.write(golds[id][0].strip() + '\n')
+            save_gold.write(golds[id].strip() + '\n')
+
+        # for paper_id, sent_scores in sent_scores_whole.items():
+
 
 
                         # for i in range(len(gold)):
