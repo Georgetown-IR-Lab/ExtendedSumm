@@ -7,7 +7,6 @@ from tensorboardX import SummaryWriter
 import distributed
 from models.reporter_ext import ReportMgr, Statistics
 from others.logging import logger
-from others.utils import test_rouge, rouge_results_to_str
 
 
 def _tally_parameters(model):
@@ -239,6 +238,7 @@ class Trainer(object):
         sent_scores_whole = {}
         paper_srcs = {}
         paper_tgts = {}
+
         with torch.no_grad():
             for batch in test_iter:
                 src = batch.src
@@ -248,13 +248,13 @@ class Trainer(object):
                 mask = batch.mask_src
                 mask_cls = batch.mask_cls
                 paper_id = batch.paper_id[0]
-                paper_src = batch.src_str
-                paper_tgt = batch.tgt_str
+                segment_src = batch.src_str
+                paper_tgt = batch.tgt_str[0]
 
-                if paper_id not in sent_scores_whole.keys():
-                    sent_scores_whole[paper_id] = []
-                    paper_srcs[paper_id] = []
-                    paper_tgts[paper_id] = []
+                # if paper_id not in sent_scores_whole.keys():
+                #     sent_scores_whole[paper_id] = []
+                #     paper_srcs[paper_id] = []
+                #     paper_tgts[paper_id] = []
 
                 if (cal_lead):
                     selected_ids = [list(range(batch.clss.size(1)))] * batch.batch_size
@@ -274,39 +274,51 @@ class Trainer(object):
 
                     sent_scores = sent_scores + mask.float()
                     sent_scores = sent_scores.cpu().data.numpy()
-                    selected_ids = np.argsort(-sent_scores, 1)
-                    # selected_ids = np.sort(selected_ids,1)
-                    for i, idx in enumerate(selected_ids):
-                        _pred = []
-                        if (len(batch.src_str[i]) == 0):
+
+                    if paper_id not in sent_scores_whole.keys():
+                        sent_scores_whole[paper_id] = sent_scores
+                        paper_srcs[paper_id] = segment_src
+                        paper_tgts[paper_id] = paper_tgt
+                    else:
+                        sent_scores_whole[paper_id] = np.concatenate((sent_scores_whole[paper_id], sent_scores), 1)
+                        paper_srcs[paper_id] = np.concatenate((paper_srcs[paper_id], segment_src), 1)
+
+
+            for paper_id, sent_scores in sent_scores_whole.items():
+                selected_ids = np.argsort(-sent_scores, 1)
+                # selected_ids = np.sort(selected_ids,1)
+                for i, idx in enumerate(selected_ids):
+                    _pred = []
+                    if (len(paper_srcs[paper_id][i]) == 0):
+                        continue
+                    for j in selected_ids[i][:len(paper_srcs[paper_id][i])]:
+                        if (j >= len(paper_srcs[paper_id][i])):
                             continue
-                        for j in selected_ids[i][:len(batch.src_str[i])]:
-                            if (j >= len(batch.src_str[i])):
-                                continue
-                            candidate = batch.src_str[i][j].strip()
-                            if (self.args.block_trigram):
-                                if (not _block_tri(candidate, _pred)):
-                                    _pred.append(candidate)
-                            else:
+                        candidate = paper_srcs[paper_id][i][j].strip()
+                        if (self.args.block_trigram):
+                            if (not _block_tri(candidate, _pred)):
                                 _pred.append(candidate)
+                        else:
+                            _pred.append(candidate)
 
-                            if ((not cal_oracle) and (not self.args.recall_eval) and len(_pred) == 3):
-                                break
+                        if ((not cal_oracle) and (not self.args.recall_eval) and len(_pred) == 4):
+                            break
 
-                        _pred = '<q>'.join(_pred)
-                        if (self.args.recall_eval):
-                            _pred = ' '.join(_pred.split()[:len(paper_tgt.split())])
+                    # _pred = '<q>'.join(_pred)
+                    _pred = ' '.join(_pred)
+                    if (self.args.recall_eval):
+                        _pred = ' '.join(_pred.split()[:len(paper_tgts[paper_id].split())])
 
-                        # pred.append(_pred)
-                        try:
-                            if paper_id in preds.keys():
-                                preds[paper_id] += _pred + ' '
-                            else:
-                                preds[paper_id] = _pred + ' '
-                        except:
-                            import pdb;
-                            pdb.set_trace()
-                        golds[paper_id] = paper_tgt[0]
+                    # pred.append(_pred)
+                    try:
+                        if paper_id in preds.keys():
+                            preds[paper_id] += _pred + ' '
+                        else:
+                            preds[paper_id] = _pred + ' '
+                    except:
+                        import pdb;
+                        pdb.set_trace()
+                    golds[paper_id] = paper_tgts[paper_id]
 
                     # gold.append(batch.tgt_str[i])
         for id, pred in preds.items():
