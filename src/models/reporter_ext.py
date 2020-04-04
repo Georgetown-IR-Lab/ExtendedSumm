@@ -167,10 +167,11 @@ class Statistics(object):
     * elapsed time
     """
 
-    def __init__(self, loss=0, loss_sent=0, loss_sect=0,  n_docs=0, n_correct=0):
+    def __init__(self, loss=0, loss_sent=-10, loss_sect=-10,  n_docs=0, n_correct=0, print_traj=False):
         self.loss = loss
         self.loss_sect = loss_sect
         self.loss_sent = loss_sent
+        self.print_traj = print_traj
         self.n_docs = n_docs
         self.start_time = time.time()
 
@@ -268,24 +269,28 @@ class Statistics(object):
         step_fmt = "%2d" % step
         if num_steps > 0:
             step_fmt = "%s/%5d" % (step_fmt, num_steps)
-        # logger.info(
-        #     ("Step %s; xent_sent: %4.2f + xent_sect: %4.2f = xent: %4.2f; " +
-        #      "lr: %7.7f; %3.0f docs/s; %6.0f sec")
-        #     % (step_fmt,
-        #        self.xent_sent(),
-        #        self.xent_sect(),
-        #        self.xent(),
-        #        learning_rate,
-        #        self.n_docs / (t + 1e-5),
-        #        time.time() - start))
+
+
+        # if self.print_traj:
         logger.info(
-            ("Step %s; xent: %4.2f; " +
+            ("Step %s; xent_sent: %4.2f + xent_sect: %4.2f = xent: %4.2f; " +
              "lr: %7.7f; %3.0f docs/s; %6.0f sec")
             % (step_fmt,
+               self.xent_sent(),
+               self.xent_sect(),
                self.xent(),
                learning_rate,
                self.n_docs / (t + 1e-5),
                time.time() - start))
+        # else:
+        #     logger.info(
+        #         ("Step %s; xent: %4.2f; " +
+        #          "lr: %7.7f; %3.0f docs/s; %6.0f sec")
+        #         % (step_fmt,
+        #            self.xent(),
+        #            learning_rate,
+        #            self.n_docs / (t + 1e-5),
+        #            time.time() - start))
         sys.stdout.flush()
 
     def log_tensorboard(self, prefix, writer, learning_rate, step):

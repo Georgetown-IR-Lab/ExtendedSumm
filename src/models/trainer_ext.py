@@ -88,6 +88,7 @@ class Trainer(object):
         self.alpha = 0.95
         self.save_checkpoint_steps = args.save_checkpoint_steps
         self.model = model
+        self.is_joint = getattr(self.model, 'is_joint')
         self.optim = optim
         self.grad_accum_count = grad_accum_count
         self.n_gpu = n_gpu
@@ -138,7 +139,6 @@ class Trainer(object):
             reduce_counter = 0
             for i, batch in enumerate(train_iter):
                 if self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
-
                     true_batchs.append(batch)
                     normalization += batch.batch_size
                     accum += 1
@@ -148,7 +148,6 @@ class Trainer(object):
                             normalization = sum(distributed
                                                 .all_gather_list
                                                 (normalization))
-
                         self._gradient_accumulation(
                             true_batchs, normalization, total_stats,
                             report_stats)
@@ -262,7 +261,7 @@ class Trainer(object):
                     selected_ids = [[j for j in range(batch.clss.size(1)) if labels[i][j] == 1] for i in
                                     range(batch.batch_size)]
                 else:
-                    sent_scores, _, mask = self.model(src, segs, clss, mask, mask_cls)
+                    sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
                     # import pdb;pdb.set_trace()
                     try:
                         loss = self.loss(sent_scores, labels.float())
@@ -301,7 +300,7 @@ class Trainer(object):
                         else:
                             _pred.append(candidate)
 
-                        if ((not cal_oracle) and (not self.args.recall_eval) and len(_pred) == 4):
+                        if ((not cal_oracle) and (not self.args.recall_eval) and len(_pred) == 3):
                             break
 
                     # _pred = '<q>'.join(_pred)
@@ -324,7 +323,8 @@ class Trainer(object):
         for id, pred in preds.items():
             save_pred.write(pred.strip() + '\n')
             save_gold.write(golds[id].strip() + '\n')
-
+        print(f'Gold: {gold_path}')
+        print(f'Prediction: {can_path}')
         # for paper_id, sent_scores in sent_scores_whole.items():
 
 
@@ -351,37 +351,33 @@ class Trainer(object):
 
             src = batch.src
             labels = batch.src_sent_labels
-            # sect_labels = batch.src_sent_sect_labels
             sent_sect_labels = batch.sent_sect_labels
             segs = batch.segs
             clss = batch.clss
             mask = batch.mask_src
             mask_cls = batch.mask_cls
 
-            # sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-            sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-            loss = self.loss(sent_scores, labels.float())
-            # loss_sect = 0
-            # loss_sect=self.loss_sect(sent_sect_scores, sent_sect_labels)
+            if self.is_joint:
+                sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                loss_sent = self.loss(sent_scores, labels.float())
+                loss_sect = 0
 
-            # for deep_slice in range(sent_sect_scores.size(1)):
-            #     try:
-            #         loss_sect += self.loss_sect(sent_sect_scores[:, deep_slice, :], sent_sect_labels[:, deep_slice])
-            #     except:
-            #         import pdb;pdb.set_trace()
-            # loss_sect = self.loss_sect(sent_sect_scores, sect_labels)
+                for deep_slice in range(sent_sect_scores.size(1)):
+                    loss_sect += self.loss_sect(sent_sect_scores[:, deep_slice, :], sent_sect_labels[:, deep_slice])
+                loss = (self.alpha * loss_sent) + ((1 - self.alpha) * loss_sect)
+                loss = (loss * mask.float()).sum()
+                loss_sect = (loss_sect * mask.float()).sum()
+                loss_sent = (loss_sent * mask.float()).sum()
+                batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), loss_sect=float(loss_sect.cpu().data.numpy()),
+                                         loss_sent=float(loss_sent.cpu().data.numpy()), n_docs=normalization, print_traj=True)
 
-            # loss = (self.alpha * loss_sent) + ((1-self.alpha) * loss_sect)
 
-            loss = (loss * mask.float()).sum()
+            else: # not joint
+                sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                loss = self.loss(sent_scores, labels.float())
+                batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), n_docs=normalization)
+
             (loss / loss.numel()).backward()
-
-            # loss_sent = self.alpha * (loss_sent * mask.float()).sum()
-            # loss_sect = (1-self.alpha) * (loss_sect * mask.float()).sum()
-
-            # loss.div(float(normalization)).backward()
-            # batch_stats = Statistics(float(loss.cpu().data.numpy()), float(loss_sent.cpu().data.numpy()), float(loss_sect.cpu().data.numpy()), normalization)
-            batch_stats = Statistics(float(loss.cpu().data.numpy()), normalization)
 
             total_stats.update(batch_stats)
             report_stats.update(batch_stats)

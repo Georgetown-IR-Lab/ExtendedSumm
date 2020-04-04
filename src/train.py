@@ -108,6 +108,8 @@ if __name__ == '__main__':
     parser.add_argument("-report_rouge", type=str2bool, nargs='?',const=True,default=True)
     parser.add_argument("-block_trigram", type=str2bool, nargs='?', const=True, default=True)
 
+    parser.add_argument("-section_prediction", action='store_true')
+
     args = parser.parse_args()
     args.gpu_ranks = [int(i) for i in range(len(args.visible_gpus.split(',')))]
     args.world_size = len(args.gpu_ranks)
@@ -143,16 +145,16 @@ if __name__ == '__main__':
 
     elif (args.task == 'ext'):
         if (args.mode == 'train'):
-            train_ext(args, device_id)
+            train_ext(args, device_id, args.section_prediction)
         elif (args.mode == 'validate'):
-            validate_ext(args, device_id)
+            validate_ext(args, device_id, args.section_prediction)
         if (args.mode == 'test'):
             cp = args.test_from
             try:
                 step = int(cp.split('.')[-2].split('_')[-1])
             except:
                 step = 0
-            test_ext(args, device_id, cp, step)
+            test_ext(args, device_id, cp, step, args.section_prediction)
         elif (args.mode == 'test_text'):
             cp = args.test_from
             try:

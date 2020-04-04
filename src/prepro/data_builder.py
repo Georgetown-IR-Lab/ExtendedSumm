@@ -101,21 +101,100 @@ def load_xml(p):
     else:
         return None, None
 
+def sent_sect_arxiv(args):
+    corpura = ['train', 'val', 'test']
+    files = []
+    json_dir = '/disk1/sajad/datasets/download_google_drive/arxiv/json/'
+    for corpus_type in corpura:
+        papers = {}
+        files = []
+        for f in glob.glob('/disk1/sajad/datasets/download_google_drive/arxiv/inputs/' + corpus_type + '/*.json'):
+            files.append(f)
+        corpora = {corpus_type: files}
+        for corpus_type in corpora.keys():
+            a_lst = [(f, corpus_type, args) for f in corpora[corpus_type]]
+            papers = {}
+            # for a in a_lst:
+            #     data = _sent_sect_arxiv(a)
+                # papers[data['paper_id']] = data['sent_sect_labels']
 
-def sent_sect(args):
+            pool = Pool(12)
+            for data in tqdm(pool.imap_unordered(_sent_sect_arxiv, a_lst), total=len(a_lst)):
+                papers[data['paper_id']] = data['sent_sect_labels']
+
+
+            pool.close()
+            pool.join()
+
+            with open(json_dir + corpus_type + '-sect' + '.pkl', 'wb') as handle:
+                pickle.dump(papers, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
+def _sent_sect_arxiv(params):
+
+    f, set, args = params
+    test_kws = pd.read_csv('train_papers_sects.csv')
+
+    kws = {
+        'intro': [kw.strip() for kw in test_kws['intro'].dropna()],
+        'related': [kw.strip() for kw in test_kws['related work'].dropna()],
+        'experiments': [kw.strip() for kw in test_kws['experiments'].dropna()],
+        'results': [kw.strip() for kw in test_kws['results'].dropna()],
+        'conclusion': [kw.strip() for kw in test_kws['conclusion'].dropna()]
+    }
+
+    papers = {}
+    with open(f, 'r') as f:
+        paper = json.loads(f.read())
+        paper_id = paper['id']
+        paper_sect_labels = []
+        for i, sect in enumerate(paper['section_names']):
+            sect_main_title = sect.lower().strip()
+            sentence_num = paper['section_lengths'][i]
+            if len(sect_main_title.strip())>0:
+                if 'introduction' in sect_main_title.split()[0] or sect_main_title in kws['intro']:
+                    paper_sect_labels.extend([0] * sentence_num)
+
+                elif sect_main_title in kws['related']:
+                    paper_sect_labels.extend([1] * sentence_num)
+
+                elif sect_main_title in kws['experiments']:
+                    paper_sect_labels.extend([3] * sentence_num)
+
+                elif 'result' in sect_main_title \
+                        or 'discussion' in sect_main_title \
+                        or sect_main_title in kws['results']:
+                    paper_sect_labels.extend([4] * sentence_num)
+
+                elif 'conclusion' in sect_main_title or 'summary' in sect_main_title or sect_main_title in kws['conclusion']:
+                    paper_sect_labels.extend([5] * sentence_num)
+
+                else:
+                    paper_sect_labels.extend([2] * sentence_num)
+
+        if 5 in paper_sect_labels:
+            paper_sect_labels = paper_sect_labels[:len(paper_sect_labels) - paper_sect_labels[::-1].index(5)]
+        elif 4 in paper_sect_labels:
+            paper_sect_labels = paper_sect_labels[:len(paper_sect_labels) - paper_sect_labels[::-1].index(4)]
+
+        return {'paper_id': paper_id, 'sent_sect_labels':paper_sect_labels}
+
+
+def sent_sect_mine(args):
     json_dirs = []
     for c_type in ['train', 'val', 'test']:
         json_dirs.append(args.raw_path + c_type + '.json')
         # _sent_sect(args.raw_path + c_type + '.json')
     pool = Pool(15)
-    for d in pool.imap(_sent_sect, json_dirs):
+    for d in pool.imap(_sent_sect_mine, json_dirs):
         pass
 
     pool.close()
     pool.join()
 
 
-def _sent_sect(json_dir):
+def _sent_sect_mine(json_dir):
     global sentence_num
     test_kws = pd.read_csv('train_papers_sects.csv')
 
@@ -148,8 +227,8 @@ def _sent_sect(json_dir):
                         sentence_num = len(ann.sentence)
                         total_sent += sentence_num
 
-                    sect_main_title = sect['section_title'].lower()
-                    if sect_main_title in kws['intro']:
+                    sect_main_title = sect['section_title'].lower().strip()
+                    if 'introduction' in sect_main_title.split()[0] or sect_main_title in kws['intro']:
                         papers[paper_id].extend([0] * sentence_num)
 
                     elif sect_main_title in kws['related']:
@@ -158,11 +237,11 @@ def _sent_sect(json_dir):
                     elif sect_main_title in kws['experiments']:
                         papers[paper_id].extend([3] * sentence_num)
 
-                    elif 'analysis' in sect_main_title or 'result' in sect_main_title \
+                    elif 'result' in sect_main_title.split()[0] \
                             or sect_main_title in kws['results']:
                         papers[paper_id].extend([4] * sentence_num)
 
-                    elif sect_main_title in kws['conclusion']:
+                    elif 'conclusion' in sect_main_title.split()[0] or sect_main_title in kws['conclusion']:
                         papers[paper_id].extend([5] * sentence_num)
 
                     else:
@@ -264,11 +343,6 @@ def identify_sent_sects(paper_sent_sect, segment_sent_ids, lst_segment=False):
             "conclusion": 5
     :rtype:
     """
-    # if lst_segment:
-    #     segment_sent_ids = segment_sent_ids[:-1]
-
-    # import pdb;
-    # pdb.set_trace()
 
     sects = []
     for id in segment_sent_ids:
@@ -331,6 +405,31 @@ def hashhex(s):
     h.update(s.encode('utf-8'))
     return h.hexdigest()
 
+
+def tokenize_with_corenlp(input_text, id):
+    in_file = open('inputs/input-' + str(id) + '.txt', mode='w')
+    in_file.write(input_text.strip())
+    in_file.close()
+
+    command = ['java', 'edu.stanford.nlp.pipeline.StanfordCoreNLP', '-annotators', 'tokenize,ssplit',
+               '-ssplit.newlineIsSentenceBreak', 'always', '-file', 'inputs/input-' + str(id) + '.txt', '-outputFormat',
+               'json', '-outputDirectory', 'tokenized/']
+    subprocess.call(command)
+    with open('tokenized/input-' + str(id) + '.txt.json') as f:
+        tokenized = json.loads(f.read())
+
+    out_tokenized = []
+
+    for sent in tokenized['sentences']:
+        sent_tokens = []
+        for i, tkn in enumerate(sent['tokens']):
+            sent_tokens.append(tkn['word'])
+        out_tokenized.append(sent_tokens.copy())
+
+    # os.remove('input.txt')
+    # os.remove('tokenized/input.txt.json')
+
+    return out_tokenized
 
 class BertData():
     def __init__(self, args):
@@ -401,152 +500,181 @@ class BertData():
         return src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt
 
 
+
 def format_to_bert(args):
     if (args.dataset != ''):
         datasets = [args.dataset]
     else:
         datasets = ['test']
     for corpus_type in datasets:
-        with open('/home/sajad/datasets/CSPUBSUM/json-splits/' + corpus_type + '-sect.pkl', 'rb') as handle:
+        with open('/disk1/sajad/datasets/download_google_drive/arxiv/json/' + corpus_type + '-sect.pkl', 'rb') as handle:
             sent_sect = pickle.load(handle)
         a_lst = []
+
+
         for json_f in glob.glob(pjoin(args.raw_path, '*' + corpus_type + '.*.json')):
             real_name = json_f.split('/')[-1]
             a_lst.append(
                 (corpus_type, json_f, args, pjoin(args.save_path, real_name.replace('json', 'bert.pt')), sent_sect))
-        for a in a_lst:
-            _format_to_bert(a)
-        # pool = Pool(24)
-        # for d in pool.imap(_format_to_bert, a_lst):
-        #     pass
+        # for a in a_lst:
+        #     _format_to_bert(a)
+        pool = Pool(15)
+        for d in pool.imap(_format_to_bert, a_lst):
+            pass
 
-        # pool.close()
-        # pool.join()
+        pool.close()
+        pool.join()
 
 
 #
 
-def _format_to_bert(params):
-    corpus_type, json_file, args, save_file, sent_sect_dict = params
+def format_to_bert_arxiv(args):
+    if (args.dataset != ''):
+        datasets = [args.dataset]
+    else:
+        datasets = ['test']
+    for corpus_type in datasets:
+        with open('/disk1/sajad/datasets/download_google_drive/arxiv/json/' + corpus_type + '-sect.pkl', 'rb') as handle:
+            sent_sect = pickle.load(handle)
+        a_lst = []
+        c = 0
+        for json_f in glob.glob(pjoin(args.raw_path, 'json/*' + corpus_type + '.*.json')):
+
+            real_name = json_f.split('/')[-1]
+            if not os.path.exists(pjoin(args.save_path, real_name.replace('json', 'bert.pt'))):
+                c+=1
+            a_lst.append((corpus_type, json_f, args, pjoin(args.save_path, real_name.replace('json', 'bert.pt')), sent_sect))
+        print("Number of files: " + str(c))
+
+        for a in a_lst:
+            _format_to_bert(a)
+        #
+        # pool = Pool(20)
+        # for d in pool.imap(_format_to_bert, a_lst):
+        #     pass
+        #
+        # pool.close()
+        # pool.join()
+
+
+def _format_to_bert(param):
+    corpus_type, json_file, args, save_file, sent_sect_dict = param
+    emp = 0
     is_test = corpus_type == 'test'
     if (os.path.exists(save_file)):
         logger.info('Ignore %s' % save_file)
         return
+    print('bef')
     bert = BertData(args)
-
+    print('aft')
     logger.info('Processing %s' % json_file)
     print(f"Reading {json_file}")
     jobs = json.load(open(json_file))
     datasets = []
-    # jobs = jobs[740:]
-    # if len(jobs) > 200:
-    #     jobs = jobs[:739] + jobs[740:]
-    #     jobs = jobs[:1075] + jobs[1076:]
-    #     jobs = jobs[:1075] + jobs[1076:]
-    #     jobs = jobs[:1075] + jobs[1076:]
-    #     jobs = jobs[:1672] + jobs[1674:]
-        # jobs = jobs[:167] + jobs[1673:]
-        # jobs = jobs[1674:]
-    for j, d in tqdm(enumerate(jobs), total=len(jobs)):
-        source, tgt, paper_id = d['src'], d['tgt'], d['id']
-        if paper_id not in sent_sect_dict.keys():
-            print('not indexed')
-            continue
-        # if j==0:
-        #     import pdb;pdb.set_trace()
-        segment = []
-        segment_sent_num = []
-        token_ctr = 0
-        i = 0
-        # for i, sent in enumerate(source):
-        while i < len(source):
-            sent = source[i]
-            if len(sent) + token_ctr < 1024:
-                segment.append(sent)
-                segment_sent_num.append(i)
-                token_ctr += len(sent)
-                if i == len(source) - 1:
-                    token_ctr = 0
-                    # import pdb;pdb.set_trace()
 
-                    lst_segment = True
+    for j, data in tqdm(enumerate(jobs), total=len(jobs)):
+        source, tgt, paper_id = data['tgt'], data['id'], data['src']
+        if len(source) > 1 and len(tgt) > 1 and len(paper_id) > 0:
+            segment = []
+            segment_sent_num = []
+            token_ctr = 0
+            i = 0
+            while i < len(sent_sect_dict[paper_id]):
+                try:
+                    sent = source[i]
+                except:
+                    emp+=1
+                    break
+                if len(sent) + token_ctr < 1024:
+                    segment.append(sent)
+                    segment_sent_num.append(i)
+                    token_ctr += len(sent)
+                    # print(i)
+                    if i == len(sent_sect_dict[paper_id]) - 1:
+                        token_ctr = 0
+                        # if i == 127: import pdb;pdb.set_trace()
+                        lst_segment = True
+                        sent_labels = greedy_selection(segment, tgt, 3)
+                        sent_sect_labels = identify_sent_sects(sent_sect_dict[paper_id], segment_sent_num.copy(),
+                                                               lst_segment)
+                        if (args.lower):
+                            segment = [' '.join(s).lower().split() for s in segment]
+                            tgt = [' '.join(s).lower().split() for s in tgt]
+                        b_data = bert.preprocess(segment.copy(), tgt, sent_labels,
+                                                 use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
+                                                 is_test=is_test)
+                        if (b_data is None):
+                            continue
+                        src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
+                        try:
+                            assert len(sent_sect_labels) == len(
+                                sent_labels), "Number of segment_sent and section_sents should be the same"
+                            assert len(cls_ids) == len(
+                                sent_labels), "Number of segment_sent and section_sents should be the same"
+                        except:
+                            import pdb;
+                            pdb.set_trace()
+
+                        b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
+                                       "src_sent_labels": sent_labels, "segs": segments_ids, 'clss': cls_ids,
+                                       'src_txt': src_txt, "tgt_txt": tgt_txt, "paper_id": paper_id,
+                                       "sent_sect_labels": sent_sect_labels}
+
+                        datasets.append(b_data_dict.copy())
+                        segment_sent_num.clear()
+                        segment.clear()
+
+                else:
+                    if len(sent) >= 1024 and len(segment) == 0:
+                        # import pdb;pdb.set_trace()
+                        sent_sect_dict[paper_id] = sent_sect_dict[paper_id][:i] + sent_sect_dict[paper_id][i + 1:]
+                        source = source[:i] + source[i + 1:]
+                        # i = i + 1
+                        continue
+                    # import pdb;pdb.set_trace()
+                    i = i - 1
+                    token_ctr = 0
                     sent_labels = greedy_selection(segment, tgt, 3)
-                    sent_sect_labels = identify_sent_sects(sent_sect_dict[paper_id], segment_sent_num.copy(),
-                                                           lst_segment)
+                    sent_sect_labels = identify_sent_sects(sent_sect_dict[paper_id], segment_sent_num.copy())
                     if (args.lower):
                         segment = [' '.join(s).lower().split() for s in segment]
                         tgt = [' '.join(s).lower().split() for s in tgt]
+
                     b_data = bert.preprocess(segment.copy(), tgt, sent_labels,
                                              use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
                                              is_test=is_test)
-
                     # b_data = bert.preprocess(source, tgt, sent_labels, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer)
-
                     if (b_data is None):
+
+
                         continue
 
                     src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
-                    try:
-                        assert len(sent_sect_labels) == len(
-                            sent_labels), "Number of segment_sent and section_sents should be the same"
-                        assert len(cls_ids) == len(
-                            sent_labels), "Number of segment_sent and section_sents should be the same"
-                    except:
-                        import pdb;
-                        pdb.set_trace()
+
+                    assert len(sent_sect_labels) == len(
+                        sent_labels), "Number of segment_sent and section_sents should be the same"
+                    assert len(cls_ids) == len(sent_labels), "Number of segment_sent and section_sents should be the same"
+                    assert len(cls_ids) == len(sent_sect_labels), "Number of segment_sent and section_sents should be the same"
 
                     b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
                                    "src_sent_labels": sent_labels, "segs": segments_ids, 'clss': cls_ids,
                                    'src_txt': src_txt, "tgt_txt": tgt_txt, "paper_id": paper_id,
                                    "sent_sect_labels": sent_sect_labels}
-
                     datasets.append(b_data_dict.copy())
                     segment_sent_num.clear()
                     segment.clear()
 
-            else:
-                if len(sent) > 1024 and len(segment) == 0:
-                    # import pdb;pdb.set_trace()
-                    sent_sect_dict[paper_id] = sent_sect_dict[paper_id][:i] + sent_sect_dict[paper_id][i + 1:]
-                    i = i + 1
-                    continue
-                # import pdb;pdb.set_trace()
-                i = i - 1
-                token_ctr = 0
-                sent_labels = greedy_selection(segment, tgt, 3)
-                sent_sect_labels = identify_sent_sects(sent_sect_dict[paper_id], segment_sent_num.copy())
-                if (args.lower):
-                    segment = [' '.join(s).lower().split() for s in segment]
-                    tgt = [' '.join(s).lower().split() for s in tgt]
-                b_data = bert.preprocess(segment.copy(), tgt, sent_labels,
-                                         use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
-                                         is_test=is_test)
-                # b_data = bert.preprocess(source, tgt, sent_labels, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer)
-
-                if (b_data is None):
-                    continue
-
-                src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
-                assert len(sent_sect_labels) == len(
-                    sent_labels), "Number of segment_sent and section_sents should be the same"
-                assert len(cls_ids) == len(sent_labels), "Number of segment_sent and section_sents should be the same"
-                assert len(cls_ids) == len(sent_sect_labels), "Number of segment_sent and section_sents should be the same"
-
-                b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
-                               "src_sent_labels": sent_labels, "segs": segments_ids, 'clss': cls_ids,
-                               'src_txt': src_txt, "tgt_txt": tgt_txt, "paper_id": paper_id,
-                               "sent_sect_labels": sent_sect_labels}
-                datasets.append(b_data_dict.copy())
-                segment_sent_num.clear()
-                segment.clear()
-
-            i += 1
-
+                i += 1
+        else:
+            emp +=1
+            continue
+    if emp > 0: print(f'Empty: {emp}')
     logger.info('Processed instances %d' % len(datasets))
     logger.info('Saving to %s' % save_file)
     torch.save(datasets, save_file)
     datasets = []
     gc.collect()
+
 
 
 def format_to_lines(args):
@@ -564,7 +692,7 @@ def format_to_lines(args):
         pool = Pool(args.n_cpus)
         dataset = []
         p_ct = 0
-        for d in pool.imap_unordered(_format_to_lines, a_lst):
+        for d in tqdm(pool.imap_unordered(_format_to_lines, a_lst), total=len(a_lst)):
             dataset.append(d)
             # print(args.shard_size)
             if (len(dataset) > args.shard_size):
@@ -593,6 +721,71 @@ def _format_to_lines(params):
     print(f)
     source, tgt, id = load_json(f, args.lower)
     return {'id': id.replace('.txt', '').replace('.json', '').strip(), 'src': source, 'tgt': tgt}
+
+
+def format_arxiv_to_lines(args):
+    if args.dataset != '':
+        corpus_type = args.dataset
+    else:
+        corpus_type = 'train'
+    corpus_mapping = {}
+    files = []
+    for f in glob.glob('/disk1/sajad/datasets/download_google_drive/arxiv/inputs/' + corpus_type + '/*.json'):
+        files.append(f)
+    corpora = {corpus_type: files}
+    for corpus_type in corpora.keys():
+        a_lst = [(f, corpus_type, args) for f in corpora[corpus_type]]
+        pool = Pool(args.n_cpus)
+        dataset = []
+        p_ct = 0
+        # for a in a_lst:
+        #     _format_arxiv_to_lines(a)
+        for d in tqdm(pool.imap_unordered(_format_arxiv_to_lines, a_lst), total=len(a_lst)):
+            dataset.append(d)
+            # print(args.shard_size)
+            if (len(dataset) > args.shard_size):
+                pt_file = "{:s}{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
+                with open(pt_file, 'w') as save:
+                    # save.write('\n'.join(dataset))
+                    save.write(json.dumps(dataset))
+                    p_ct += 1
+                    dataset = []
+
+        pool.close()
+        pool.join()
+        if (len(dataset) > 0):
+            print(args.save_path)
+            pt_file = "{:s}{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
+            print(pt_file)
+            with open(pt_file, 'w') as save:
+                # save.write('\n'.join(dataset))
+                save.write(json.dumps(dataset))
+                p_ct += 1
+                dataset = []
+
+def _format_arxiv_to_lines(params):
+    def load_arxiv_json(src_json, set, lower=True):
+        source = []
+        # flag = False
+        id = json.load(open(src_json))['id']
+        for sent_info in json.load(open(src_json))['inputs']:
+            tokens = sent_info['tokens']
+            if (lower):
+                tokens = [t.lower() for t in tokens]
+            source.append(tokens)
+
+        tgt_txt_path = src_json.split('arxiv/')[0] + 'arxiv/' + 'human-abstracts/' + set +'/' + id + '.txt'
+        with open(tgt_txt_path, mode='r') as f:
+            abs_text = f.read()
+        abs_text = abs_text.strip()
+
+        tknized_abs = tokenize_with_corenlp(abs_text, id)
+
+        return id, source, tknized_abs
+
+    f, corpus_type, args = params
+    source, tgt, id = load_arxiv_json(f, corpus_type, args.lower)
+    return {'id': id, 'src': source, 'tgt': tgt}
 
 
 def format_xsum_to_lines(args):

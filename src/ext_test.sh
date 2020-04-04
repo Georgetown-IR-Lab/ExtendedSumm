@@ -1,7 +1,7 @@
 
 DATA_PATH=/home/sajad/datasets/CSPUBSUM/bert-files
 MAX_POS=1024
-RESULT_PATH=../logs/ext1024-bertsum-colins.txt
+RESULT_PATH=../logs/ext1024-seg-multi-colins
 CHECKPOINT=../models/ext1024-seg-multi-colins/model_step_70000.pt
 MODEL_PATH=../models/ext1024-seg-multi-colins/
 

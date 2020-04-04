@@ -133,7 +133,7 @@ class Bert(nn.Module):
 
 
 class ExtSummarizer(nn.Module):
-    def __init__(self, args, device, checkpoint, is_joint=True):
+    def __init__(self, args, device, checkpoint, is_joint=False):
         super(ExtSummarizer, self).__init__()
         self.args = args
         self.device = device
