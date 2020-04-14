@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 
 from models.neural import MultiHeadedAttention, PositionwiseFeedForward
 
@@ -71,7 +72,7 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class ExtTransformerEncoder(nn.Module):
-    def __init__(self, d_model, d_ff, heads, dropout, num_inter_layers=0):
+    def __init__(self, d_model, d_ff, heads, dropout, num_inter_layers=0, is_joint=False):
         super(ExtTransformerEncoder, self).__init__()
         self.d_model = d_model
         self.num_inter_layers = num_inter_layers
@@ -81,26 +82,60 @@ class ExtTransformerEncoder(nn.Module):
              for _ in range(num_inter_layers)])
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
-        self.wo = nn.Linear(d_model, 1, bias=True)
+        self.wo = nn.Linear(768, 1, bias=True)
         self.sigmoid = nn.Sigmoid()
+
+        self.is_joint = is_joint
+        if self.is_joint:
+            # import pdb;pdb.set_trace()
+            # Add the second linear layer
+            # self.lstm = nn.LSTM(d_model, 128, 2, bias=True, dropout=0.4, bidirectional=True)
+            self.wo_2 = nn.Linear(768, 4, bias=True)
+            # self.wo_22 = nn.Linear(256, 4, bias=True)
+            # self.wo_2 = nn.Linear(d_model, 4, bias=True)
+            self.softmax = nn.Softmax(dim=1)
+
+            # self.cnn = CNNEncoder()
+
+            # for name, param in self.lstm.named_parameters():
+            #     if 'bias' in name:
+            #         nn.init.constant(param, 0.0)
+            #     elif 'weight' in name:
+            #         nn.init.xavier_normal(param)
 
     def forward(self, top_vecs, mask):
         """ See :obj:`EncoderBase.forward()`"""
 
         batch_size, n_sents = top_vecs.size(0), top_vecs.size(1)
+
+        # Transformer Encoder
         pos_emb = self.pos_emb.pe[:, :n_sents]
         x = top_vecs * mask[:, :, None].float()
         x = x + pos_emb
 
         for i in range(self.num_inter_layers):
             x = self.transformer_inter[i](i, x, x, 1 - mask)  # all_sents * max_tokens * dim
-
         x = self.layer_norm(x)
-        sent_scores = self.sigmoid(self.wo(x))
 
+        # if self.is_joint: #LSTM
+            # Concat x and h_t
+            # x = torch.cat((x, h_t.permute(1, 0, 2)), dim=2)
+
+        # CNN
+        # if self.is_joint:
+            # x = torch.cat((x, cnn_encoded.unsqueeze(1).repeat(1, x.size(1), 1)), 2)
+
+        sent_scores = self.sigmoid(self.wo(x))
         sent_scores = sent_scores.squeeze(-1) * mask.float()
 
-        return sent_scores
+        if self.is_joint:
+            sent_sect_scores = self.softmax(self.wo_2(x))
+            sent_sect_scores = sent_sect_scores * mask.float().unsqueeze(-1).repeat(1, 1, 4)
+            return sent_scores, sent_sect_scores
+
+        else:
+            return sent_scores
+
 
 class ExtTransformerPredictor(nn.Module):
     def __init__(self, d_model, d_ff, heads, dropout, num_inter_layers=0):
@@ -113,7 +148,7 @@ class ExtTransformerPredictor(nn.Module):
              for _ in range(num_inter_layers)])
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
-        self.wo = nn.Linear(d_model, 6, bias=True)
+        self.wo = nn.Linear(d_model, 4, bias=True)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, top_vecs, mask):
@@ -129,6 +164,85 @@ class ExtTransformerPredictor(nn.Module):
 
         x = self.layer_norm(x)
         sent_section_scores = self.softmax(self.wo(x))
-        sent_section_scores = sent_section_scores * mask.float().unsqueeze(-1).repeat(1,1,6)
+        sent_section_scores = sent_section_scores * mask.float().unsqueeze(-1).repeat(1, 1, 4)
+        # import pdb;pdb.set_trace()
+        # sent_section_scores = sent_section_scores.permute(0,2,1)
 
         return sent_section_scores
+
+
+class CNNEncoder(nn.Module):
+    def __init__(self, output_size=256, in_channels=1, out_channels=10, kernel_heights=[1, 1, 2], stride=1,
+                 embedding_length=768, keep_probab=0.3):
+        super(CNNEncoder, self).__init__()
+
+        """
+        Arguments
+        ---------
+        batch_size : Size of each batch which is same as the batch_size of the data returned by the TorchText BucketIterator
+        output_size : 2 = (pos, neg)
+        in_channels : Number of input channels. Here it is 1 as the input data has dimension = (batch_size, num_seq, embedding_length)
+        out_channels : Number of output channels after convolution operation performed on the input matrix
+        kernel_heights : A list consisting of 3 different kernel_heights. Convolution will be performed 3 times and finally results from each kernel_height will be concatenated.
+        keep_probab : Probability of retaining an activation node during dropout operation
+        vocab_size : Size of the vocabulary containing unique words
+        embedding_length : Embedding dimension of GloVe word embeddings
+        weights : Pre-trained GloVe word_embeddings which we will use to create our word_embedding look-up table
+        --------
+
+        """
+        self.output_size = output_size
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_heights = kernel_heights
+        self.stride = stride
+        self.embedding_length = embedding_length
+
+        self.conv1 = nn.Conv2d(in_channels, out_channels, (kernel_heights[0], embedding_length))
+        self.conv2 = nn.Conv2d(in_channels, out_channels, (kernel_heights[1], embedding_length))
+        self.conv3 = nn.Conv2d(in_channels, out_channels, (kernel_heights[2], embedding_length))
+        self.dropout = nn.Dropout(keep_probab)
+        self.label = nn.Linear(len(kernel_heights) * out_channels, output_size)
+
+    def conv_block(self, input, conv_layer):
+        conv_out = conv_layer(input)  # conv_out.size() = (batch_size, out_channels, dim, 1)
+        activation = F.relu(conv_out.squeeze(3))  # activation.size() = (batch_size, out_channels, dim1)
+        max_out = F.max_pool1d(activation, activation.size()[2]).squeeze(
+            2)  # maxpool_out.size() = (batch_size, out_channels)
+
+        return max_out
+
+    def forward(self, input_sentences, batch_size=None):
+        """
+        The idea of the Convolutional Neural Netwok for Text Classification is very simple. We perform convolution operation on the embedding matrix
+        whose shape for each batch is (num_seq, embedding_length) with kernel of varying height but constant width which is same as the embedding_length.
+        We will be using ReLU activation after the convolution operation and then for each kernel height, we will use max_pool operation on each tensor
+        and will filter all the maximum activation for every channel and then we will concatenate the resulting tensors. This output is then fully connected
+        to the output layers consisting two units which basically gives us the logits for both positive and negative classes.
+
+        Parameters
+        ----------
+        input_sentences: input_sentences of shape = (batch_size, num_sequences)
+        batch_size : default = None. Used only for prediction on a single sentence after training (batch_size = 1)
+
+        Returns
+        -------
+        Output of the linear layer containing logits for pos & neg class.
+        logits.size() = (batch_size, output_size)
+
+        """
+
+        # input.size() = (batch_size, num_seq, embedding_length)
+        input = input_sentences.unsqueeze(1)
+        # input.size() = (batch_size, 1, num_seq, embedding_length)
+        max_out1 = self.conv_block(input, self.conv1)
+        max_out2 = self.conv_block(input, self.conv2)
+        max_out3 = self.conv_block(input, self.conv3)
+
+        all_out = torch.cat((max_out1, max_out2, max_out3), 1)
+        # all_out.size() = (batch_size, num_kernels*out_channels)
+        fc_in = self.dropout(all_out)
+        # fc_in.size()) = (batch_size, num_kernels*out_channels)
+        logits = self.label(fc_in)
+
+        return logits

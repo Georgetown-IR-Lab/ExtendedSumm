@@ -48,6 +48,7 @@ if __name__ == '__main__':
     parser.add_argument("-select_mode", default='greedy', type=str)
     parser.add_argument("-map_path", default='../../data/')
     parser.add_argument("-raw_path", default='../../line_data')
+    parser.add_argument("-sect_label_path", default='../../line_data')
     parser.add_argument("-save_path", default='../../data/')
 
     parser.add_argument("-shard_size", default=2000, type=int)

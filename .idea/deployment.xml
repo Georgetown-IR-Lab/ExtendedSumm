@@ -9,6 +9,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="barolo-stat">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/sci-trained-models/presum/arxiv-bertsum-multi" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="brunello">
         <serverdata>
           <mappings>

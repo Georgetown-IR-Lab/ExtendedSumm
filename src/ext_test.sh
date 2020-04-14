@@ -1,9 +1,27 @@
 
-DATA_PATH=/home/sajad/datasets/CSPUBSUM/bert-files
+
+
+server() {
+    servername="$1"
+    if servername==barolo
+    then
+        DATA_PATH=/disk1/sajad/datasets/cspubsum/bert-files/
+        MAX_POS=1024
+        MODEL_PATH=/disk1/sajad/sci-trained-models/presum/cspubsum-bertsum-multi-shared/
+    else
+        DATA_PATH=/disk1/sajad/datasets/sci/cspubsum/bert-files
+        MAX_POS=1024
+        MODEL_PATH=/disk1/sajad/sci-trained-models/presum/cspubsum-bertsum-multi-shared4-seperate/
+    fi
+    echo "$DATA_PATH $MODEL_PATH $MAX_POS"
+}
+
+
+DATA_PATH=/disk1/sajad/datasets/cspubsum/bert-files/
 MAX_POS=1024
-RESULT_PATH=../logs/ext1024-seg-multi-colins
-CHECKPOINT=../models/ext1024-seg-multi-colins/model_step_70000.pt
-MODEL_PATH=../models/ext1024-seg-multi-colins/
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/cspubsum-lstm-conc//
+CHECKPOINT=/disk1/sajad/sci-trained-models/presum/cspubsum-lstm-conc//model_step_128000.pt
+RESULT_PATH=../logs/cspubsum-bertsum-multi-shared4-rg
 
 python train.py -task ext \
                 -mode test \
@@ -11,13 +29,14 @@ python train.py -task ext \
                 -test_batch_size 1 \
                 -bert_data_path $DATA_PATH \
                 -log_file ../logs/val_ext \
-                -model_path  $MODEL_PATH \
+                -model_path $MODEL_PATH \
                 -sep_optim true \
                 -use_interval true \
-                -visible_gpus 0 \
+                -visible_gpus 0,1 \
                 -max_pos $MAX_POS \
                 -max_length 500 \
                 -alpha 0.95 \
                 -min_length 50 \
                 -result_path $RESULT_PATH \
-                -test_from $CHECKPOINT
+                -test_from $CHECKPOINT \
+                -section_prediction

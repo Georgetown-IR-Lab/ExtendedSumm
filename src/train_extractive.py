@@ -234,6 +234,9 @@ def train_single_ext(args, device_id, is_joint=False):
     def train_iter_fct():
         return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
                                       shuffle=True, is_test=False)
+    def val_iter_fct():
+        return data_loader.Dataloader(args, load_dataset(args, 'valid', shuffle=True), args.test_batch_size, device,
+                                      shuffle=True, is_test=True)
 
     model = ExtSummarizer(args, device, checkpoint, is_joint)
     optim = model_builder.build_optim(args, model, checkpoint)
@@ -241,4 +244,4 @@ def train_single_ext(args, device_id, is_joint=False):
     logger.info(model)
 
     trainer = build_trainer(args, device_id, model, optim)
-    trainer.train(train_iter_fct, args.train_steps)
+    trainer.train(train_iter_fct, args.train_steps, valid_iter_fct=val_iter_fct)

@@ -13,7 +13,7 @@ def build_optim(args, model, checkpoint):
     """ Build optimizer """
 
     if checkpoint is not None:
-        optim = checkpoint['optim'][0]
+        optim = checkpoint['optim']
         saved_optimizer_state_dict = optim.optimizer.state_dict()
         optim.optimizer.load_state_dict(saved_optimizer_state_dict)
         if args.visible_gpus != '-1':
@@ -140,11 +140,11 @@ class ExtSummarizer(nn.Module):
         self.bert = Bert(args.large, args.temp_dir, args.finetune_bert)
         self.is_joint = is_joint
         self.ext_layer = ExtTransformerEncoder(self.bert.model.config.hidden_size, args.ext_ff_size, args.ext_heads,
-                                               args.ext_dropout, args.ext_layers)
+                                               args.ext_dropout, args.ext_layers, is_joint=is_joint)
 
-        if self.is_joint:
-            self.section_predictor = ExtTransformerPredictor(self.bert.model.config.hidden_size, args.ext_ff_size, args.ext_heads,
-                                                   args.ext_dropout, args.ext_layers)
+        # if self.is_joint:
+        #     self.section_predictor = ExtTransformerPredictor(self.bert.model.config.hidden_size, args.ext_ff_size, args.ext_heads,
+        #                                            args.ext_dropout, args.ext_layers)
         if (args.encoder == 'baseline'):
             bert_config = BertConfig(self.bert.model.config.vocab_size, hidden_size=args.ext_hidden_size,
                                      num_hidden_layers=args.ext_layers, num_attention_heads=args.ext_heads, intermediate_size=args.ext_ff_size)
@@ -174,13 +174,22 @@ class ExtSummarizer(nn.Module):
 
     def forward(self, src, segs, clss, mask_src, mask_cls):
         top_vec = self.bert(src, segs, mask_src)
+
         sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss]
+
         sents_vec = sents_vec * mask_cls[:, :, None].float()
-        sent_scores = self.ext_layer(sents_vec, mask_cls).squeeze(-1)
+
         if self.is_joint:
-            sent_sect_scores = self.section_predictor(sents_vec, mask_cls).squeeze(-1)
+            sent_scores, sent_sect_scores = self.ext_layer(sents_vec, mask_cls)
+            # sent_sect_scores = self.section_predictor(sents_vec, mask_cls)
+            sent_scores, sent_sect_scores = sent_scores.squeeze(-1), sent_sect_scores.squeeze(-1)
             return sent_scores, sent_sect_scores, mask_cls
-        return sent_scores, mask_cls
+        else:
+            sent_scores = self.ext_layer(sents_vec, mask_cls).squeeze(-1)
+            return sent_scores, mask_cls
+
+        # sent_sect_scores = self.section_predictor(sents_vec, mask_cls).squeeze(-1)
+            # return sent_scores, sent_sect_scores, mask_cls
 
 
 class AbsSummarizer(nn.Module):

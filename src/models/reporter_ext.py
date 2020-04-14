@@ -114,10 +114,10 @@ class ReportMgr(ReportMgrBase):
         super(ReportMgr, self).__init__(report_every, start_time)
         self.tensorboard_writer = tensorboard_writer
 
-    def maybe_log_tensorboard(self, stats, prefix, learning_rate, step):
+    def maybe_log_tensorboard(self, stats, prefix, learning_rate, step, report_rl = False):
         if self.tensorboard_writer is not None:
             stats.log_tensorboard(
-                prefix, self.tensorboard_writer, learning_rate, step)
+                prefix, self.tensorboard_writer, learning_rate, step, report_rl)
 
     def _report_training(self, step, num_steps, learning_rate,
                          report_stats):
@@ -141,7 +141,7 @@ class ReportMgr(ReportMgrBase):
         See base class method `ReportMgrBase.report_step`.
         """
         if train_stats is not None:
-            self.log('Train xent: %g' % train_stats.xent())
+            # self.log('Train xent: %g' % train_stats.xent())
 
             self.maybe_log_tensorboard(train_stats,
                                        "train",
@@ -150,11 +150,13 @@ class ReportMgr(ReportMgrBase):
 
         if valid_stats is not None:
             self.log('Validation xent: %g at step %d' % (valid_stats.xent(), step))
+            # self.log('Validation: sent_xent: %g, sect_xent: %g, xent: %g at step %d' %
+            #          (valid_stats.xent_sent(),valid_stats.xent_sect(),valid_stats.xent(), step))
 
             self.maybe_log_tensorboard(valid_stats,
                                        "valid",
                                        lr,
-                                       step)
+                                       step, report_rl=True)
 
 
 class Statistics(object):
@@ -167,12 +169,15 @@ class Statistics(object):
     * elapsed time
     """
 
-    def __init__(self, loss=0, loss_sent=-10, loss_sect=-10,  n_docs=0, n_correct=0, print_traj=False):
+    def __init__(self, loss=0, loss_sent=-10, loss_sect=-10,  n_docs=0, n_correct=0, r1=0, r2=0, rl=0, print_traj=False):
         self.loss = loss
         self.loss_sect = loss_sect
         self.loss_sent = loss_sent
         self.print_traj = print_traj
         self.n_docs = n_docs
+        self.r1 = r1
+        self.r2 = r2
+        self.rl = rl
         self.start_time = time.time()
 
     @staticmethod
@@ -235,6 +240,11 @@ class Statistics(object):
 
         self.n_docs += stat.n_docs
 
+    def set_rl(self, r1, r2, rl):
+        self.r1 = r1
+        self.r2 = r2
+        self.rl = rl
+
     def xent(self):
         """ compute cross entropy """
         if (self.n_docs == 0):
@@ -293,8 +303,14 @@ class Statistics(object):
         #            time.time() - start))
         sys.stdout.flush()
 
-    def log_tensorboard(self, prefix, writer, learning_rate, step):
+    def log_tensorboard(self, prefix, writer, learning_rate, step, report_rl=False):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/xent", self.xent(), step)
+        writer.add_scalar(prefix + "/xent_sent", self.xent_sent(), step)
+        writer.add_scalar(prefix + "/xent_sect", self.xent_sect(), step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
+        if report_rl:
+            writer.add_scalar(prefix + "/Rouge-l", self.rl, step)
+            writer.add_scalar(prefix + "/Rouge-1", self.r2, step)
+            writer.add_scalar(prefix + "/Rouge-2", self.r1, step)
