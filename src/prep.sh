@@ -3,7 +3,9 @@
 # RAW_DIR_FILES=/home/sajad/datasets/longsumm/files/
 # RAW_DIR_JSON=/home/sajad/datasets/longsumm/files/json/
 
-BERT_DIR=/home/sajad/datasets/cspubsum/bert-files/
+mkdir -p /home/sajad/datasets/cspubsum/bert-files/3label/
+
+BERT_DIR=/home/sajad/datasets/cspubsum/bert-files/3label/
 RAW_PATH=/home/sajad/datasets/cspubsum/files/
 SECT_LABLE_DIR=/home/sajad/datasets/cspubsum/
 SAVE_JSON=/home/sajad/datasets/cspubsum/files/json/

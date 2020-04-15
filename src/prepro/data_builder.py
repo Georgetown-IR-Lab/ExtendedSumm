@@ -531,7 +531,6 @@ def format_to_bert(args):
             sent_sect = pickle.load(handle)
         a_lst = []
 
-
         for json_f in glob.glob(pjoin(args.raw_path, 'json', '*' + corpus_type + '.*.json')):
             real_name = json_f.split('/')[-1]
             a_lst.append(
@@ -583,6 +582,7 @@ def format_to_bert_arxiv(args):
 
 
 def _format_to_bert(param):
+
     corpus_type, json_file, args, save_file, sent_sect_dict = param
     emp = 0
     is_test = corpus_type == 'test'
@@ -604,6 +604,11 @@ def _format_to_bert(param):
             segment_sent_num = []
             token_ctr = 0
             i = 0
+
+            if paper_id in sent_sect_dict.keys():
+                for i, sect_label in enumerate(sent_sect_dict[paper_id]):
+                    if sect_label > 2:
+                        sent_sect_dict[paper_id][i] = 2
 
             # if len(sent_sect_dict[paper_id]) != len(source):
             #     print('Terribke1')

@@ -169,15 +169,18 @@ class Statistics(object):
     * elapsed time
     """
 
-    def __init__(self, loss=0, loss_sent=-10, loss_sect=-10,  n_docs=0, n_correct=0, r1=0, r2=0, rl=0, print_traj=False):
+    def __init__(self, loss=0, loss_sent=-10, loss_sect=-10, n_docs=0, n_acc = 0,acurracy_sent=0, acurracy_sect=0, n_correct=0, r1=0, r2=0, rl=0, print_traj=False):
         self.loss = loss
         self.loss_sect = loss_sect
         self.loss_sent = loss_sent
         self.print_traj = print_traj
         self.n_docs = n_docs
+        self.n_acc = n_acc
         self.r1 = r1
         self.r2 = r2
         self.rl = rl
+        self.acurracy_sent = acurracy_sent
+        self.acurracy_sect = acurracy_sect
         self.start_time = time.time()
 
     @staticmethod
@@ -238,7 +241,11 @@ class Statistics(object):
         self.loss_sent += stat.loss_sent
         self.loss_sect += stat.loss_sect
 
+        self.acurracy_sent += stat.acurracy_sent
+        self.acurracy_sect += stat.acurracy_sect
+
         self.n_docs += stat.n_docs
+        self.n_acc += stat.n_acc
 
     def set_rl(self, r1, r2, rl):
         self.r1 = r1
@@ -250,6 +257,16 @@ class Statistics(object):
         if (self.n_docs == 0):
             return 0
         return self.loss / self.n_docs
+
+    def _get_acc_sent(self):
+        if self.n_acc==0:
+            return 0
+        return self.acurracy_sent / self.n_acc
+
+    def _get_acc_sect(self):
+        if self.n_acc == 0:
+            return 0
+        return self.acurracy_sect / self.n_acc
 
     def xent_sent(self):
         """ compute cross entropy """
@@ -283,12 +300,14 @@ class Statistics(object):
 
         # if self.print_traj:
         logger.info(
-            ("Step %s; xent_sent: %4.2f + xent_sect: %4.2f = xent: %4.2f; " +
+            ("Step %s; xent_sent: %4.2f + xent_sect: %4.2f = xent: %4.2f (accuracy-sent: %4.2f, accuracy-sect: %4.2f); " +
              "lr: %7.7f; %3.0f docs/s; %6.0f sec")
             % (step_fmt,
                self.xent_sent(),
                self.xent_sect(),
                self.xent(),
+               self._get_acc_sent(),
+               self._get_acc_sect(),
                learning_rate,
                self.n_docs / (t + 1e-5),
                time.time() - start))
@@ -307,9 +326,11 @@ class Statistics(object):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/xent", self.xent(), step)
+        writer.add_scalar(prefix + "/accuracy_sent", self._get_acc_sent(), step)
+        writer.add_scalar(prefix + "/accuracy_sect", self._get_acc_sect(), step)
         writer.add_scalar(prefix + "/xent_sent", self.xent_sent(), step)
         writer.add_scalar(prefix + "/xent_sect", self.xent_sect(), step)
-        writer.add_scalar(prefix + "/lr", learning_rate, step)
+        # writer.add_scalar(prefix + "/lr", learning_rate, step)
         if report_rl:
             writer.add_scalar(prefix + "/Rouge-l", self.rl, step)
             writer.add_scalar(prefix + "/Rouge-1", self.r2, step)

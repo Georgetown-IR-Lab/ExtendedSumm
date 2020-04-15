@@ -92,7 +92,7 @@ class Trainer(object):
                  report_manager=None):
         # Basic attributes.
         self.args = args
-        self.alpha = 0.0
+        self.alpha = 0.6
         self.save_checkpoint_steps = args.save_checkpoint_steps
         self.model = model
         self.is_joint = getattr(self.model, 'is_joint')
@@ -138,6 +138,7 @@ class Trainer(object):
         true_batchs = []
         accum = 0
         normalization = 0
+        sent_num_normalization = 0
         train_iter = train_iter_fct()
 
         total_stats = Statistics()
@@ -172,6 +173,7 @@ class Trainer(object):
                         true_batchs = []
                         accum = 0
                         normalization = 0
+                        sent_num_normalization = 0
                         if (step % self.save_checkpoint_steps == 0 and self.gpu_rank == 0):
                             self._save(step)
 
@@ -183,7 +185,7 @@ class Trainer(object):
                                 self._save(step, best=True)
                                 logger.info(f'Best model saved sucessfully at step %d' % step)
                             logger.info('----------------------------------------')
-                            self.model.train()
+                            # self.model.train()
 
 
                         step += 1
@@ -553,9 +555,14 @@ class Trainer(object):
                 loss = loss_sent + loss_sect
                 # loss = (loss * mask.float()).sum()
 
+                # if len(sent_scores.shape)==1:
+                #     import pdb;pdb.set_trace()
+
                 batch_stats = Statistics(loss=float(loss.cpu().data.numpy()),
                                          loss_sect=float(loss_sect.cpu().data.numpy()),
-                                         loss_sent=float(loss_sent.cpu().data.numpy()), n_docs=normalization,
+                                         loss_sent=float(loss_sent.cpu().data.numpy()), n_docs=normalization, n_acc=batch.batch_size,
+                                         acurracy_sent=self._get_acurracy(sent_scores, labels, task='sent'),
+                                         acurracy_sect=self._get_acurracy(sent_sect_scores, labels, task='sent_sect'),
                                          print_traj=True)
 
 
@@ -563,7 +570,7 @@ class Trainer(object):
                 sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
                 loss = self.loss(sent_scores, labels.float())
                 loss = (loss * mask.float()).sum()
-                batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), n_docs=normalization)
+                batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), acurracy_sent=self._get_acurracy(sent_scores, labels, task='sent'), n_docs=normalization)
 
             (loss / loss.numel()).backward()
 
@@ -679,3 +686,17 @@ class Trainer(object):
         print("ROUGE-2\t{:.2f}\t({:.2f},{:.2f})".format(r2, r2_cf[0] - r2, r2_cf[1] - r2))
         print("ROUGE-L\t{:.2f}\t({:.2f},{:.2f})".format(rl, rl_cf[0] - rl, rl_cf[1] - rl))
         return r1, r2, rl
+
+    def _get_acurracy(self, sent_scores, labels, task='sent_sect'):
+        if task == 'sent_sect':
+            pred = torch.max(sent_scores, 2)[1]
+            acc = (pred == labels).sum().item() / labels.size(1)
+        else:
+            try:
+                pred = torch.where(sent_scores > 0.5, torch.ones(sent_scores.size(0), sent_scores.size(1)).cuda(), torch.zeros(sent_scores.size(0), sent_scores.size(1)).cuda()).long()
+            except:
+                pred = torch.where(sent_scores > 0.5, torch.ones(sent_scores.size(0)).cuda(), torch.zeros(sent_scores.size(0)).cuda()).long()
+
+            acc = (pred == labels).sum().item() / labels.size(1)
+        return acc
+

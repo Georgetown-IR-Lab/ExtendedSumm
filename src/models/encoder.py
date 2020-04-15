@@ -82,26 +82,12 @@ class ExtTransformerEncoder(nn.Module):
              for _ in range(num_inter_layers)])
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
-        self.wo = nn.Linear(768, 1, bias=True)
+        self.wo = nn.Linear(d_model, 1, bias=True)
         self.sigmoid = nn.Sigmoid()
 
         self.is_joint = is_joint
         if self.is_joint:
-            # import pdb;pdb.set_trace()
-            # Add the second linear layer
-            # self.lstm = nn.LSTM(d_model, 128, 2, bias=True, dropout=0.4, bidirectional=True)
-            self.wo_2 = nn.Linear(768, 4, bias=True)
-            # self.wo_22 = nn.Linear(256, 4, bias=True)
-            # self.wo_2 = nn.Linear(d_model, 4, bias=True)
-            self.softmax = nn.Softmax(dim=1)
-
-            # self.cnn = CNNEncoder()
-
-            # for name, param in self.lstm.named_parameters():
-            #     if 'bias' in name:
-            #         nn.init.constant(param, 0.0)
-            #     elif 'weight' in name:
-            #         nn.init.xavier_normal(param)
+            self.wo_2 = nn.Linear(d_model, 4, bias=True)
 
     def forward(self, top_vecs, mask):
         """ See :obj:`EncoderBase.forward()`"""
@@ -117,20 +103,13 @@ class ExtTransformerEncoder(nn.Module):
             x = self.transformer_inter[i](i, x, x, 1 - mask)  # all_sents * max_tokens * dim
         x = self.layer_norm(x)
 
-        # if self.is_joint: #LSTM
-            # Concat x and h_t
-            # x = torch.cat((x, h_t.permute(1, 0, 2)), dim=2)
-
-        # CNN
-        # if self.is_joint:
-            # x = torch.cat((x, cnn_encoded.unsqueeze(1).repeat(1, x.size(1), 1)), 2)
-
         sent_scores = self.sigmoid(self.wo(x))
+
         sent_scores = sent_scores.squeeze(-1) * mask.float()
 
         if self.is_joint:
-            sent_sect_scores = self.softmax(self.wo_2(x))
-            sent_sect_scores = sent_sect_scores * mask.float().unsqueeze(-1).repeat(1, 1, 4)
+            sent_sect_scores = self.wo_2(x)
+            sent_sect_scores = sent_sect_scores.squeeze(-1) * mask.unsqueeze(2).expand_as(sent_sect_scores).float()
             return sent_scores, sent_sect_scores
 
         else:

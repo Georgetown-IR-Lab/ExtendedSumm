@@ -119,6 +119,7 @@ class Bert(nn.Module):
             self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
         else:
             self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
+            # self.model = BertModel.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased', cache_dir=temp_dir)
 
         self.finetune = finetune
 
@@ -174,15 +175,15 @@ class ExtSummarizer(nn.Module):
 
     def forward(self, src, segs, clss, mask_src, mask_cls):
         top_vec = self.bert(src, segs, mask_src)
-
         sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss]
-
         sents_vec = sents_vec * mask_cls[:, :, None].float()
 
         if self.is_joint:
             sent_scores, sent_sect_scores = self.ext_layer(sents_vec, mask_cls)
             # sent_sect_scores = self.section_predictor(sents_vec, mask_cls)
-            sent_scores, sent_sect_scores = sent_scores.squeeze(-1), sent_sect_scores.squeeze(-1)
+            # sent_scores, sent_sect_scores = sent_scores.squeeze(-1), sent_sect_scores.squeeze(-1)
+            # if len(sent_scores.shape) == 1:
+            #     import pdb;pdb.set_trace()
             return sent_scores, sent_sect_scores, mask_cls
         else:
             sent_scores = self.ext_layer(sents_vec, mask_cls).squeeze(-1)
