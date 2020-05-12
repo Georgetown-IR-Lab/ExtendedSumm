@@ -23,7 +23,7 @@ from others.logging import logger, init_logger
 model_flags = ['hidden_size', 'ff_size', 'heads', 'inter_layers', 'encoder', 'ff_actv', 'use_interval', 'rnn_size']
 
 
-def train_multi_ext(args):
+def train_multi_ext(args, is_joint):
     """ Spawns 1 process per GPU """
     init_logger()
 
@@ -39,7 +39,7 @@ def train_multi_ext(args):
     for i in range(nb_gpu):
         device_id = i
         procs.append(mp.Process(target=run, args=(args,
-                                                  device_id, error_queue,), daemon=True))
+                                                  device_id, error_queue, is_joint,), daemon=True))
         procs[i].start()
         logger.info(" Starting process pid: %d  " % procs[i].pid)
         error_handler.add_child(procs[i].pid)
@@ -47,7 +47,7 @@ def train_multi_ext(args):
         p.join()
 
 
-def run(args, device_id, error_queue):
+def run(args, device_id, error_queue, is_joint):
     """ run process """
     setattr(args, 'gpu_ranks', [int(i) for i in args.gpu_ranks])
 
@@ -58,7 +58,7 @@ def run(args, device_id, error_queue):
             raise AssertionError("An error occurred in \
                   Distributed initialization")
 
-        train_single_ext(args, device_id, args.section_prediction)
+        train_single_ext(args, device_id, is_joint)
     except KeyboardInterrupt:
         pass  # killed by parent, do nothing
     except Exception:
@@ -103,7 +103,7 @@ class ErrorHandler(object):
         raise Exception(msg)
 
 
-def validate_ext(args, device_id, is_joint=False):
+def validate_ext(args, device_id):
     timestep = 0
     if (args.test_all):
         cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
@@ -111,7 +111,7 @@ def validate_ext(args, device_id, is_joint=False):
         xent_lst = []
         for i, cp in enumerate(cp_files):
             step = int(cp.split('.')[-2].split('_')[-1])
-            xent = validate(args, device_id, cp, step, is_joint)
+            xent = validate(args, device_id, cp, step)
             xent_lst.append((xent, cp))
             max_step = xent_lst.index(min(xent_lst))
             if (i - max_step > 10):
@@ -120,7 +120,7 @@ def validate_ext(args, device_id, is_joint=False):
         logger.info('PPL %s' % str(xent_lst))
         for xent, cp in xent_lst:
             step = int(cp.split('.')[-2].split('_')[-1])
-            test_ext(args, device_id, cp, step, is_joint)
+            test_ext(args, device_id, cp, step)
     else:
         while (True):
             cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
@@ -134,8 +134,8 @@ def validate_ext(args, device_id, is_joint=False):
                 if (time_of_cp > timestep):
                     timestep = time_of_cp
                     step = int(cp.split('.')[-2].split('_')[-1])
-                    validate(args, device_id, cp, step, is_joint)
-                    test_ext(args, device_id, cp, step, is_joint)
+                    validate(args, device_id, cp, step)
+                    test_ext(args, device_id, cp, step)
 
             cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
             cp_files.sort(key=os.path.getmtime)
@@ -148,7 +148,7 @@ def validate_ext(args, device_id, is_joint=False):
                 time.sleep(300)
 
 
-def validate(args, device_id, pt, step, is_joint=False):
+def validate(args, device_id, pt, step):
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
     if (pt != ''):
         test_from = pt
@@ -162,7 +162,7 @@ def validate(args, device_id, pt, step, is_joint=False):
             setattr(args, k, opt[k])
     print(args)
 
-    model = ExtSummarizer(args, device, checkpoint, is_joint)
+    model = ExtSummarizer(args, device, checkpoint)
     model.eval()
 
     valid_iter = data_loader.Dataloader(args, load_dataset(args, 'valid', shuffle=False),
@@ -170,7 +170,7 @@ def validate(args, device_id, pt, step, is_joint=False):
                                         shuffle=False, is_test=False)
     trainer = build_trainer(args, device_id, model, None)
     stats = trainer.validate(valid_iter, step)
-    return stats.xent()
+    return stats.total_loss()
 
 
 def test_ext(args, device_id, pt, step, is_joint=False):
@@ -186,7 +186,8 @@ def test_ext(args, device_id, pt, step, is_joint=False):
         if (k in model_flags):
             setattr(args, k, opt[k])
     print(args)
-    model = ExtSummarizer(args, device, checkpoint, is_joint)
+
+    model = ExtSummarizer(args, device, checkpoint, is_joint=is_joint)
     model.eval()
 
     test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
@@ -197,13 +198,14 @@ def test_ext(args, device_id, pt, step, is_joint=False):
 
 def train_ext(args, device_id, is_joint=False):
     if (args.world_size > 1):
-        train_multi_ext(args)
+        train_multi_ext(args, is_joint)
     else:
         train_single_ext(args, device_id, is_joint)
 
 
 def train_single_ext(args, device_id, is_joint=False):
     init_logger(args.log_file)
+
 
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
     logger.info('Device ID %d' % device_id)
@@ -235,7 +237,7 @@ def train_single_ext(args, device_id, is_joint=False):
         return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
                                       shuffle=True, is_test=False)
     def val_iter_fct():
-        return data_loader.Dataloader(args, load_dataset(args, 'valid', shuffle=True), args.test_batch_size, device,
+        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=True), args.test_batch_size, device,
                                       shuffle=True, is_test=True)
 
     model = ExtSummarizer(args, device, checkpoint, is_joint)

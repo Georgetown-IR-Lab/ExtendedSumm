@@ -1,6 +1,8 @@
 """ Report manager utility """
 from __future__ import print_function
 
+import math
+import os
 import sys
 import time
 from datetime import datetime
@@ -52,7 +54,7 @@ class ReportMgrBase(object):
         logger.info(*args, **kwargs)
 
     def report_training(self, step, num_steps, learning_rate,
-                        report_stats, multigpu=False):
+                        report_stats, is_joint=False, multigpu=False):
         """
         This is the user-defined batch-level traing progress
         report function.
@@ -76,7 +78,7 @@ class ReportMgrBase(object):
             self._report_training(
                 step, num_steps, learning_rate, report_stats)
             self.progress_step += 1
-            return Statistics()
+            return Statistics(print_traj=is_joint)
         else:
             return report_stats
 
@@ -114,7 +116,7 @@ class ReportMgr(ReportMgrBase):
         super(ReportMgr, self).__init__(report_every, start_time)
         self.tensorboard_writer = tensorboard_writer
 
-    def maybe_log_tensorboard(self, stats, prefix, learning_rate, step, report_rl = False):
+    def maybe_log_tensorboard(self, stats, prefix, learning_rate, step, report_rl=False):
         if self.tensorboard_writer is not None:
             stats.log_tensorboard(
                 prefix, self.tensorboard_writer, learning_rate, step, report_rl)
@@ -136,20 +138,28 @@ class ReportMgr(ReportMgrBase):
 
         return report_stats
 
+    def _report_opt(self, step, report_stats):
+        self.maybe_log_tensorboard(report_stats,
+                                   "Opt/Steps",
+                                   learning_rate=1,
+                                   step=step)
+
     def _report_step(self, lr, step, train_stats=None, valid_stats=None):
         """
         See base class method `ReportMgrBase.report_step`.
         """
-        if train_stats is not None:
-            # self.log('Train xent: %g' % train_stats.xent())
+        # if train_stats is not None:
+        # self.log('Train xent: %g' % train_stats.xent())
 
-            self.maybe_log_tensorboard(train_stats,
-                                       "train",
-                                       lr,
-                                       step)
+        # self.maybe_log_tensorboard(train_stats,
+        #                            "train",
+        #                            lr,
+        #                            step)
 
         if valid_stats is not None:
-            self.log('Validation xent: %g at step %d' % (valid_stats.xent(), step))
+            self.log('Validation xent: %g (mse_sent: %g, xent_sect: %g) at step %d' % (valid_stats.total_loss(),
+                                                                                       valid_stats.mse_sent(),
+                                                                                       valid_stats.xent_sect(), step))
             # self.log('Validation: sent_xent: %g, sect_xent: %g, xent: %g at step %d' %
             #          (valid_stats.xent_sent(),valid_stats.xent_sect(),valid_stats.xent(), step))
 
@@ -169,7 +179,8 @@ class Statistics(object):
     * elapsed time
     """
 
-    def __init__(self, loss=0, loss_sent=-10, loss_sect=-10, n_docs=0, n_acc = 0,acurracy_sent=0, acurracy_sect=0, n_correct=0, r1=0, r2=0, rl=0, print_traj=False):
+    def __init__(self, loss=0, loss_sent=0, loss_sect=0, n_docs=0, n_acc=0, RMSE=0, F1sect={},
+                 n_correct=0, r1=0, r2=0, rl=0, stat_file_dir=None, print_traj=False):
         self.loss = loss
         self.loss_sect = loss_sect
         self.loss_sent = loss_sent
@@ -179,9 +190,28 @@ class Statistics(object):
         self.r1 = r1
         self.r2 = r2
         self.rl = rl
-        self.acurracy_sent = acurracy_sent
-        self.acurracy_sect = acurracy_sect
+        self.RMSE = RMSE
+        self.F1sect = F1sect.copy()
+        self.n_f1_sep = F1sect.copy()
+
+        for key, val in F1sect.items():
+            if val != -1:
+                self.n_f1_sep[key] = val[1]
+            if val == -1:
+                self.n_f1_sep[key] = 0
+
+        for key, val in F1sect.items():
+            if val != -1:
+                self.F1sect[key] = val[0]
+            if val == -1:
+                self.F1sect[key] = 0
+
         self.start_time = time.time()
+        if stat_file_dir is not None:
+            if stat_file_dir[-1] == '/':
+                stat_file_dir = stat_file_dir[:-1]
+            stat_file_dir = stat_file_dir.rsplit('/', 1)[1]
+            self.validation_file = open('../logs/valstat.' + stat_file_dir + '.txt', mode='a')
 
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
@@ -241,37 +271,64 @@ class Statistics(object):
         self.loss_sent += stat.loss_sent
         self.loss_sect += stat.loss_sect
 
-        self.acurracy_sent += stat.acurracy_sent
-        self.acurracy_sect += stat.acurracy_sect
+        self.RMSE += stat.RMSE
+        # section-wise
+        # self.F1sect += stat.F1sect
+        # self.F1sect = np.add(self.F1sect, stat.F1sect)
+
+        for key, val in stat.F1sect.items():
+            if key in self.F1sect.keys():
+                self.F1sect[key] += val
+            else:
+                self.F1sect[key] = val
+
+        for key, val in stat.n_f1_sep.items():
+            if key in self.n_f1_sep.keys():
+                self.n_f1_sep[key] += val
+            else:
+                self.n_f1_sep[key] = val
+
+        # self.F1sect = np.add(self.F1sect, stat.F1sect)
 
         self.n_docs += stat.n_docs
         self.n_acc += stat.n_acc
+
+        # import pdb;
+        # pdb.set_trace()
 
     def set_rl(self, r1, r2, rl):
         self.r1 = r1
         self.r2 = r2
         self.rl = rl
 
-    def xent(self):
+    def total_loss(self):
         """ compute cross entropy """
         if (self.n_docs == 0):
             return 0
         return self.loss / self.n_docs
 
-    def _get_acc_sent(self):
-        if self.n_acc==0:
-            return 0
-        return self.acurracy_sent / self.n_acc
-
-    def _get_acc_sect(self):
+    def _get_rmse_sent(self):
         if self.n_acc == 0:
             return 0
-        return self.acurracy_sect / self.n_acc
+        return math.sqrt(self.RMSE / self.n_acc)
 
-    def xent_sent(self):
+    def _get_f1_sect(self):
+        if self.n_acc == 0:
+            return 0
+        f0 = self.F1sect['f0'] / self.n_f1_sep['f0'] if self.n_f1_sep['f0'] != 0 else 0
+        f1 = self.F1sect['f1'] / self.n_f1_sep['f1'] if self.n_f1_sep['f1'] != 0 else 0
+        f2 = self.F1sect['f2'] / self.n_f1_sep['f2'] if self.n_f1_sep['f2'] != 0 else 0
+        f3 = self.F1sect['f3'] / self.n_f1_sep['f3'] if self.n_f1_sep['f3'] != 0 else 0
+        f4 = self.F1sect['f4'] / self.n_f1_sep['f4'] if self.n_f1_sep['f4'] != 0 else 0
+
+        return (f0 + f1 + f2 + f3 + f4) / 5, f0, f1, f2, f3, f4
+
+    def mse_sent(self):
         """ compute cross entropy """
         if (self.n_docs == 0):
             return 0
+        # if float(('%4.6f')%(self.loss_sent / self.n_docs)) == 0:
+        #     import pdb;pdb.set_trace()
         return self.loss_sent / self.n_docs
 
     def xent_sect(self):
@@ -297,41 +354,76 @@ class Statistics(object):
         if num_steps > 0:
             step_fmt = "%s/%5d" % (step_fmt, num_steps)
 
-
-        # if self.print_traj:
-        logger.info(
-            ("Step %s; xent_sent: %4.2f + xent_sect: %4.2f = xent: %4.2f (accuracy-sent: %4.2f, accuracy-sect: %4.2f); " +
-             "lr: %7.7f; %3.0f docs/s; %6.0f sec")
-            % (step_fmt,
-               self.xent_sent(),
-               self.xent_sect(),
-               self.xent(),
-               self._get_acc_sent(),
-               self._get_acc_sect(),
-               learning_rate,
-               self.n_docs / (t + 1e-5),
-               time.time() - start))
-        # else:
-        #     logger.info(
-        #         ("Step %s; xent: %4.2f; " +
-        #          "lr: %7.7f; %3.0f docs/s; %6.0f sec")
-        #         % (step_fmt,
-        #            self.xent(),
-        #            learning_rate,
-        #            self.n_docs / (t + 1e-5),
-        #            time.time() - start))
+        if self.print_traj:
+            # foveral, f11, f12, f13, f14, f15 = self.self_get_f1_sect()
+            logger.info(
+                (
+                        "Step %s; mse_sent: %4.2f (%4.2f/%d) + xent_sect: %4.2f = mlt: %4.2f (RMSE-sent: %4.2f) "
+                        # "F1-sect: %4.2f ([0] %4.2f, "
+                        # "[1] %4.2f, [2] %4.2f, [3] %4.2f, [4] %4.2f)); " +
+                        "lr: %7.7f; %3.0f docs/s; %6.0f sec")
+                % (step_fmt,
+                   self.mse_sent(),
+                   self.loss_sent,
+                   self.n_docs,
+                   self.xent_sect(),
+                   self.total_loss(),
+                   self._get_rmse_sent(),
+                   # foveral,
+                   # f11,
+                   # f12,
+                   # f13,
+                   # f14,
+                   # f15,
+                   learning_rate,
+                   self.n_docs / (t + 1e-5),
+                   time.time() - start))
+        else:
+            logger.info(
+                ("Step %s; mse_sent: %4.2f (%4.2f/%d), (RMSE-sent:%4.2f); " +
+                 "lr: %7.7f; %3.0f docs/s; %6.0f sec")
+                % (step_fmt,
+                   self.total_loss(),
+                   self.loss,
+                   self.n_docs,
+                   self._get_rmse_sent(),
+                   learning_rate,
+                   self.n_docs / (t + 1e-5),
+                   time.time() - start))
         sys.stdout.flush()
 
     def log_tensorboard(self, prefix, writer, learning_rate, step, report_rl=False):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
-        writer.add_scalar(prefix + "/xent", self.xent(), step)
-        writer.add_scalar(prefix + "/accuracy_sent", self._get_acc_sent(), step)
-        writer.add_scalar(prefix + "/accuracy_sect", self._get_acc_sect(), step)
-        writer.add_scalar(prefix + "/xent_sent", self.xent_sent(), step)
+        writer.add_scalar(prefix + "/total_loss", self.total_loss(), step)
+        writer.add_scalar(prefix + "/RMSE", self._get_rmse_sent(), step)
+        # writer.add_scalar(prefix + "/F1_sect", self._get_f1_sect()[0], step)
+        writer.add_scalar(prefix + "/mse_sent", self.mse_sent(), step)
         writer.add_scalar(prefix + "/xent_sect", self.xent_sect(), step)
-        # writer.add_scalar(prefix + "/lr", learning_rate, step)
+        writer.add_scalar(prefix + "/lr", learning_rate, step)
         if report_rl:
+            writer.add_scalar(prefix + "/Rouge-1", self.r1, step)
+            writer.add_scalar(prefix + "/Rouge-2", self.r2, step)
             writer.add_scalar(prefix + "/Rouge-l", self.rl, step)
-            writer.add_scalar(prefix + "/Rouge-1", self.r2, step)
-            writer.add_scalar(prefix + "/Rouge-2", self.r1, step)
+
+    def write_stat_header(self, is_joint):
+        if not is_joint:
+            self.validation_file.write(
+                f'\n#Step\t\tLoss\tR-1\tR-2\tR-L\n'
+            )
+        else:
+            self.validation_file.write(
+                f'\n#Step\t\t(sent, sect, loss)\t\tR-1\tR-2\tR-L\n'
+            )
+
+        self.validation_file.flush()
+        os.fsync(self.validation_file)
+
+    def _write_file(self, step, stat, r1, r2, rl):
+        self.validation_file.write(
+            '%d\t\t(%4.2f, %4.2f, %4.2f)\t\t%4.2f\t%4.2f\t%4.2f\n' % (step, stat.mse_sent(),
+                                                                      stat.xent_sect(), stat.total_loss()
+                                                                      , r1, r2, rl)
+        )
+        self.validation_file.flush()
+        os.fsync(self.validation_file)

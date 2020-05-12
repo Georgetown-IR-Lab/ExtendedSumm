@@ -194,7 +194,7 @@ def validate(args, device_id, pt, step):
 
     trainer = build_trainer(args, device_id, model, None, valid_loss)
     stats = trainer.validate(valid_iter, step)
-    return stats.xent()
+    return stats.total_loss()
 
 
 def test_abs(args, device_id, pt, step):

@@ -177,14 +177,15 @@ class Optimizer(object):
             for op in self.optimizer.optimizers:
                 op.param_groups[0]['lr'] = self.learning_rate
 
-    def step(self):
+    def step(self, report_stats):
         """Update the model parameters based on current gradients.
 
         Optionally, will employ gradient modification or update learning
         rate.
         """
         self._step += 1
-
+        # log this, gradient update
+        # report_stats.maybe_log_tensorboard(report_stats, 'Opt/training', learning_rate=1, step=self._step, report_rl=False)
         # Decay method used in tensor2tensor.
         if self.decay_method == "noam":
             self._set_rate(

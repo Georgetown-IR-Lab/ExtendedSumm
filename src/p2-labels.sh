@@ -4,5 +4,4 @@ export CLASSPATH=/home/sajad/packages/tools/stanford-corenlp-full-2018-10-05/sta
 RAW_JSON_PATH=/home/sajad/datasets/talksumm/
 
 
-python preprocess.py -mode sent_sect_arxiv \
-                    -raw_path $RAW_JSON_PATH
+python preprocess.py -mode arxiv_labels

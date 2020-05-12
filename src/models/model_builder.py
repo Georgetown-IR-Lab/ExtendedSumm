@@ -6,8 +6,9 @@ from pytorch_transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 
 from models.decoder import TransformerDecoder
-from models.encoder import Classifier, ExtTransformerEncoder, ExtTransformerPredictor
+from models.encoder import Classifier, ExtTransformerEncoder
 from models.optimizers import Optimizer
+
 
 def build_optim(args, model, checkpoint):
     """ Build optimizer """
@@ -36,8 +37,8 @@ def build_optim(args, model, checkpoint):
 
     optim.set_parameters(list(model.named_parameters()))
 
-
     return optim
+
 
 def build_optim_bert(args, model, checkpoint):
     """ Build optimizer """
@@ -67,8 +68,8 @@ def build_optim_bert(args, model, checkpoint):
     params = [(n, p) for n, p in list(model.named_parameters()) if n.startswith('bert.model')]
     optim.set_parameters(params)
 
-
     return optim
+
 
 def build_optim_dec(args, model, checkpoint):
     """ Build optimizer """
@@ -98,7 +99,6 @@ def build_optim_dec(args, model, checkpoint):
     params = [(n, p) for n, p in list(model.named_parameters()) if not n.startswith('bert.model')]
     optim.set_parameters(params)
 
-
     return optim
 
 
@@ -112,19 +112,21 @@ def get_generator(vocab_size, dec_hidden_size, device):
 
     return generator
 
+
 class Bert(nn.Module):
     def __init__(self, large, temp_dir, finetune=False):
         super(Bert, self).__init__()
-        if(large):
+        if (large):
             self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
         else:
-            self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
-            # self.model = BertModel.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased', cache_dir=temp_dir)
+            # self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
+            self.model = BertModel.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased',
+                                                   cache_dir=temp_dir)
 
         self.finetune = finetune
 
     def forward(self, x, segs, mask):
-        if(self.finetune):
+        if (self.finetune):
             top_vec, _ = self.model(x, segs, attention_mask=mask)
         else:
             self.eval()
@@ -136,61 +138,112 @@ class Bert(nn.Module):
 class ExtSummarizer(nn.Module):
     def __init__(self, args, device, checkpoint, is_joint=False):
         super(ExtSummarizer, self).__init__()
+        self.is_joint = is_joint
+
+        self.sentence_encoder = SentenceEncoder(args, device, checkpoint)
+        self.sentence_predictor = SentenceExtLayer()
+
+        # for p in self.sentence_encoder.parameters():
+        #     if p.dim() > 1:
+        #         xavier_uniform_(p)
+
+        if is_joint:
+            self.section_predictor = SectionExtLayer()
+
+        if checkpoint is not None:
+            self.load_state_dict(checkpoint['model'], strict=True)
+        else:
+            for p in self.sentence_predictor.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p)
+            for p in self.section_predictor.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p)
+
+
+
+        self.to(device)
+
+    def forward(self, src, segs, clss, mask_src, mask_cls):
+        encoded = self.sentence_encoder(src, segs, clss, mask_src, mask_cls)
+        sent_score = self.sentence_predictor(encoded, mask_cls)
+        if self.is_joint:
+            sect_scores = self.section_predictor(encoded, mask_cls)
+            return sent_score, sect_scores, mask_cls
+        else:
+            return sent_score, mask_cls
+
+
+class SentenceEncoder(nn.Module):
+    def __init__(self, args, device, checkpoint):
+        super(SentenceEncoder, self).__init__()
         self.args = args
         self.device = device
         self.bert = Bert(args.large, args.temp_dir, args.finetune_bert)
-        self.is_joint = is_joint
-        self.ext_layer = ExtTransformerEncoder(self.bert.model.config.hidden_size, args.ext_ff_size, args.ext_heads,
-                                               args.ext_dropout, args.ext_layers, is_joint=is_joint)
+        self.ext_transformer_layer = ExtTransformerEncoder(self.bert.model.config.hidden_size, args.ext_ff_size,
+                                                           args.ext_heads,
+                                                           args.ext_dropout, args.ext_layers)
 
-        # if self.is_joint:
-        #     self.section_predictor = ExtTransformerPredictor(self.bert.model.config.hidden_size, args.ext_ff_size, args.ext_heads,
-        #                                            args.ext_dropout, args.ext_layers)
         if (args.encoder == 'baseline'):
             bert_config = BertConfig(self.bert.model.config.vocab_size, hidden_size=args.ext_hidden_size,
-                                     num_hidden_layers=args.ext_layers, num_attention_heads=args.ext_heads, intermediate_size=args.ext_ff_size)
+                                     num_hidden_layers=args.ext_layers, num_attention_heads=args.ext_heads,
+                                     intermediate_size=args.ext_ff_size)
             self.bert.model = BertModel(bert_config)
-            self.ext_layer = Classifier(self.bert.model.config.hidden_size)
+            self.ext_transformer_layer = Classifier(self.bert.model.config.hidden_size)
 
-        if(args.max_pos>512):
+        if (args.max_pos > 512):
             my_pos_embeddings = nn.Embedding(args.max_pos, self.bert.model.config.hidden_size)
             my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
-            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,:].repeat(args.max_pos-512,1)
+            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,
+                                                  :].repeat(args.max_pos - 512, 1)
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
 
+        # if checkpoint is not None:
+        #     # import pdb;pdb.set_trace()
+        #     self.load_state_dict(checkpoint['model'], strict=True)
+        # else:
+        #     if args.param_init != 0.0:
+        #         for p in self.ext_transformer_layer.parameters():
+        #             p.data.uniform_(-args.param_init, args.param_init)
+        #     if args.param_init_glorot:
+        #         for p in self.ext_transformer_layer.parameters():
+        #             if p.dim() > 1:
+        #                 xavier_uniform_(p)
 
-        if checkpoint is not None:
-            # import pdb;pdb.set_trace()
-            self.load_state_dict(checkpoint['model'], strict=True)
-        else:
-            if args.param_init != 0.0:
-                for p in self.ext_layer.parameters():
-                    p.data.uniform_(-args.param_init, args.param_init)
-            if args.param_init_glorot:
-                for p in self.ext_layer.parameters():
-                    if p.dim() > 1:
-                        xavier_uniform_(p)
-
-        self.to(device)
+        # self.to(device)
 
     def forward(self, src, segs, clss, mask_src, mask_cls):
         top_vec = self.bert(src, segs, mask_src)
         sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss]
         sents_vec = sents_vec * mask_cls[:, :, None].float()
+        encoded_sent = self.ext_transformer_layer(sents_vec, mask_cls)
+        return encoded_sent
 
-        if self.is_joint:
-            sent_scores, sent_sect_scores = self.ext_layer(sents_vec, mask_cls)
-            # sent_sect_scores = self.section_predictor(sents_vec, mask_cls)
-            # sent_scores, sent_sect_scores = sent_scores.squeeze(-1), sent_sect_scores.squeeze(-1)
-            # if len(sent_scores.shape) == 1:
-            #     import pdb;pdb.set_trace()
-            return sent_scores, sent_sect_scores, mask_cls
-        else:
-            sent_scores = self.ext_layer(sents_vec, mask_cls).squeeze(-1)
-            return sent_scores, mask_cls
 
-        # sent_sect_scores = self.section_predictor(sents_vec, mask_cls).squeeze(-1)
-            # return sent_scores, sent_sect_scores, mask_cls
+class SentenceExtLayer(nn.Module):
+    def __init__(self):
+        super(SentenceExtLayer, self).__init__()
+        self.wo = nn.Linear(768, 1, bias=True)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x, mask):
+        sent_scores = self.sigmoid(self.wo(x))
+        sent_scores = sent_scores.squeeze(-1) * mask.float()
+
+        return sent_scores
+
+
+class SectionExtLayer(nn.Module):
+    def __init__(self):
+        super(SectionExtLayer, self).__init__()
+        self.wo_2 = nn.Linear(768, 5, bias=True)
+        self.dropout = nn.Dropout(0.4)
+
+    def forward(self, x, mask):
+        sent_sect_scores = self.dropout(self.wo_2(x))
+        sent_sect_scores = sent_sect_scores.squeeze(-1) * mask.unsqueeze(2).expand_as(sent_sect_scores).float()
+
+        return sent_sect_scores
 
 
 class AbsSummarizer(nn.Module):
@@ -212,10 +265,11 @@ class AbsSummarizer(nn.Module):
                                      attention_probs_dropout_prob=args.enc_dropout)
             self.bert.model = BertModel(bert_config)
 
-        if(args.max_pos>512):
+        if (args.max_pos > 512):
             my_pos_embeddings = nn.Embedding(args.max_pos, self.bert.model.config.hidden_size)
             my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
-            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,:].repeat(args.max_pos-512,1)
+            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,
+                                                  :].repeat(args.max_pos - 512, 1)
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
         self.vocab_size = self.bert.model.config.vocab_size
         tgt_embeddings = nn.Embedding(self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0)
@@ -229,7 +283,6 @@ class AbsSummarizer(nn.Module):
 
         self.generator = get_generator(self.vocab_size, self.args.dec_hidden_size, device)
         self.generator[0].weight = self.decoder.embeddings.weight
-
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint['model'], strict=True)
@@ -247,7 +300,7 @@ class AbsSummarizer(nn.Module):
                     xavier_uniform_(p)
                 else:
                     p.data.zero_()
-            if(args.use_bert_emb):
+            if (args.use_bert_emb):
                 tgt_embeddings = nn.Embedding(self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0)
                 tgt_embeddings.weight = copy.deepcopy(self.bert.model.embeddings.word_embeddings.weight)
                 self.decoder.embeddings = tgt_embeddings

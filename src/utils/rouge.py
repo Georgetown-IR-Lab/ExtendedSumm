@@ -12,6 +12,7 @@ def get_rouge(hypotheses, reference, sent_split=True, use_cf=True):
     # prepare
     for hyp, ref in zip(hypotheses, reference):
         if isinstance(hyp, list):
+            import pdb;pdb.set_trace()
             hyp = " ".join(hyp)
             ref = " ".join(ref)
         if sent_split:
@@ -30,7 +31,7 @@ def get_rouge(hypotheses, reference, sent_split=True, use_cf=True):
     score = rouge.calc_score()
     print("ROUGE done.")
     r1 = score['ROUGE-1-F']*100
-    r2 = score['ROUGE-2-F']*100
+    r2 = score['ROUGE-2-R']*100
     rl = score['ROUGE-L-F']*100
     if not use_cf:
         return r1, r2, rl

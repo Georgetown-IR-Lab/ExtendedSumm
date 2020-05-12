@@ -145,6 +145,7 @@ if __name__ == '__main__':
 
     elif (args.task == 'ext'):
         if (args.mode == 'train'):
+            # print('joint: ' + str(args.section_prediction))
             train_ext(args, device_id, args.section_prediction)
         elif (args.mode == 'validate'):
             validate_ext(args, device_id, args.section_prediction)
