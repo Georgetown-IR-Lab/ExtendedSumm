@@ -40,7 +40,6 @@ python train.py -task ext \
                 -accum_count 2 \
                 -log_file ../logs/bertmulti_cspubsum \
                 -use_interval true \
-                -finetune_bert \
                 -warmup_steps 10000 \
                 -max_pos $MAX_POS \
                 -section_prediction

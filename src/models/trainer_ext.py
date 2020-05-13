@@ -93,7 +93,7 @@ class Trainer(object):
                  report_manager=None):
         # Basic attributes.
         self.args = args
-        self.alpha = 0.75
+        self.alpha = 0.35
         self.save_checkpoint_steps = args.save_checkpoint_steps
         self.model = model
         self.is_joint = getattr(self.model, 'is_joint')
@@ -283,8 +283,11 @@ class Trainer(object):
                     loss_sect = (loss_sect * mask.float()).sum()
                     # loss_sect = (loss_sect / torch.sum(mask, dim=1).float()).mean()
 
-                    loss_sent = self.alpha * loss_sent
-                    loss_sect = (1 - self.alpha) * loss_sect
+                    # loss_sent = self.alpha * loss_sent
+                    # loss_sect = (1 - self.alpha) * loss_sect
+
+                    loss_sent = loss_sent
+                    loss_sect = loss_sect
 
                     loss = loss_sent + loss_sect
 
@@ -568,8 +571,8 @@ class Trainer(object):
             if self.is_joint:
                 sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
                 loss_sent = self.loss(sent_scores, labels.float())
-                loss_sent = (loss_sent * mask.float()).sum()
-                loss_sent = loss_sent / loss_sent.numel()
+                loss_sent = (loss_sent * mask.float()).sum(dim=1)
+                loss_sent = (loss_sent / loss_sent.numel()).sum()
 
                 # loss_sent = torch.sum((loss_sent * mask.float()), dim=1)
                 # loss_sent = (loss_sent / torch.sum(mask, dim=1).float())
@@ -578,8 +581,8 @@ class Trainer(object):
                 loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
                 # loss_sect = (loss_sect * mask.float()).sum()
                 # loss_sect = (loss_sect * mask.float()).sum(dim=1)
-                loss_sect = (loss_sect * mask.float()).sum()
-                loss_sect = loss_sect / loss_sect.numel()
+                loss_sect = (loss_sect * mask.float()).sum(dim=1)
+                loss_sect = (loss_sect / loss_sect.numel()).sum()
 
                 # loss_sect = (loss_sect / torch.sum(mask, dim=1).float()).mean()
 
@@ -589,7 +592,7 @@ class Trainer(object):
                     reg += 0.5 * (param ** 2).sum()
 
                 loss_sent = self.alpha * loss_sent
-                loss_sect = (1 - self.alpha) * (loss_sect * 0.1 * reg)
+                loss_sect = (1 - self.alpha) * (loss_sect + 0.1 * reg)
                 loss = loss_sent + loss_sect
 
                 batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
@@ -770,6 +773,12 @@ class Trainer(object):
             #         'f2': (f12.sum().item(), sent_scores.size(0)) if f12 != -1 else -1,
             #         'f3': (f13.sum().item(), sent_scores.size(0)) if f13 != -1 else -1,
             #         'f4': (f14.sum().item(), sent_scores.size(0)) if f14 != -1 else -1}
+            return {'f0': (1,1),
+                    'f1': (1,1),
+                    'f2': (1,1),
+                    'f3': (1,1),
+                    'f4': (1,1)}
+
 
 
         else:
