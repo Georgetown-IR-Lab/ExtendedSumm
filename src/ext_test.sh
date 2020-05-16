@@ -22,7 +22,7 @@ server() {
 #DATA_PATH=/home/sajad/datasets/csp-ext/bert-files/
 DATA_PATH=/disk1/sajad/datasets/sci/csp/bert-files/5l-rg/
 MAX_POS=1024
-#MODEL_PATH=/disk1/sajad/sci-trained-models/presum/csp-bertsum-multi-rg1/
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/csp-bertsum-multi-al75/
 CHECKPOINT=$MODEL_PATH/model_step_144000.pt
 #CHECKPOINT=$MODEL_PATH/BEST_model.pt
 RESULT_PATH=../logs/linearmt
@@ -42,5 +42,6 @@ python train.py -task ext \
                 -alpha 0.95 \
                 -min_length 50 \
                 -result_path $RESULT_PATH \
+                -alpha_mtl 0.4 \
                 -test_from $CHECKPOINT \
                 -section_prediction

@@ -15,14 +15,14 @@ SAVE_JSON=/disk1/sajad/datasets/sci/arxiv/json
 
 export CLASSPATH=/home/sajad/packages/tools/stanford-corenlp-full-2018-10-05/stanford-corenlp-3.9.2.jar
 
-for SET in train
+for SET in test
 do
 
 #    python preprocess.py -mode format_arxiv_to_lines \
 #                        -dataset $SET \
 #                        -save_path $SAVE_JSON \
 
-    python3 preprocess.py -mode format_to_bert_arxiv \
+    python3 preprocess.py -mode format_to_bert_cspubsum \
                         -dataset $SET \
                         -raw_path $RAW_PATH \
                         -save_path $BERT_DIR  \

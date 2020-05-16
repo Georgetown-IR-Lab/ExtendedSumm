@@ -709,14 +709,14 @@ def format_to_bert_arxiv(args):
     else:
         datasets = ['test']
 
-    tfiles = ['/disk1/sajad/datasets/sci/arxiv/json/train.1.json', '/disk1/sajad/datasets/sci/arxiv/json//train.16.json', '/disk1/sajad/datasets/sci/arxiv/json//train.18.json',
-              '/disk1/sajad/datasets/sci/arxiv/json//train.21.json', '/disk1/sajad/datasets/sci/arxiv/json//train.34.json', '/disk1/sajad/datasets/sci/arxiv/json//train.41.json',
-              '/disk1/sajad/datasets/sci/arxiv/json/train.50.json', '/disk1/sajad/datasets/sci/arxiv/json/train.99.json']
+    # tfiles = ['/disk1/sajad/datasets/sci/arxiv/json/train.1.json', '/disk1/sajad/datasets/sci/arxiv/json//train.16.json', '/disk1/sajad/datasets/sci/arxiv/json//train.18.json',
+    #           '/disk1/sajad/datasets/sci/arxiv/json//train.21.json', '/disk1/sajad/datasets/sci/arxiv/json//train.34.json', '/disk1/sajad/datasets/sci/arxiv/json//train.41.json',
+    #           '/disk1/sajad/datasets/sci/arxiv/json/train.50.json', '/disk1/sajad/datasets/sci/arxiv/json/train.99.json']
     for corpus_type in datasets:
         a_lst = []
         c = 0
-        # for json_f in glob.glob(pjoin('/disk1/sajad/datasets/sci/arxiv/json/', corpus_type + '.*.json')):
-        for json_f in tfiles:
+        for json_f in glob.glob(pjoin('/disk1/sajad/datasets/sci/arxiv/json/', corpus_type + '.*.json')):
+        # for json_f in tfiles:
             real_name = json_f.split('/')[-1]
             if not os.path.exists(pjoin(args.save_path, real_name.replace('json', 'bert.pt'))):
                 c += 1
@@ -940,7 +940,7 @@ def format_to_bert_cspubsum(args):
         datasets = ['test']
 
     data = []
-    with open('/home/sajad/packages/sum/scientific-paper-summarisation/Data/Train_Data/all_data_' + str(datasets[0]) + '.json') as f:
+    with open('/home/sajad/packages/sum/scientific-paper-summarisation/Data/Test_Data/all_data_' + str(datasets[0]) + '.json') as f:
         for li in f:
             data.append(json.loads(li.strip()))
 
@@ -983,7 +983,6 @@ def _format_to_bert_cspubsum(param):
 
         elif sect in kws['conclusion']:
             return 4
-
         else:
             return 2
 

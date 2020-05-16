@@ -157,9 +157,9 @@ class ReportMgr(ReportMgrBase):
         #                            step)
 
         if valid_stats is not None:
-            self.log('Validation xent: %g (mse_sent: %g, xent_sect: %g) at step %d' % (valid_stats.total_loss(),
+            self.log('Validation xent: %g (mse_sent: %g, xent_sect: %g), (ACC: %4.4f) at step %d' % (valid_stats.total_loss(),
                                                                                        valid_stats.mse_sent(),
-                                                                                       valid_stats.xent_sect(), step))
+                                                                                       valid_stats.xent_sect(), valid_stats._get_acc_sect(), step))
             # self.log('Validation: sent_xent: %g, sect_xent: %g, xent: %g at step %d' %
             #          (valid_stats.xent_sent(),valid_stats.xent_sect(),valid_stats.xent(), step))
 
@@ -179,7 +179,7 @@ class Statistics(object):
     * elapsed time
     """
 
-    def __init__(self, loss=0, loss_sent=0, loss_sect=0, n_docs=0, n_acc=0, RMSE=0, F1sect={},
+    def __init__(self, loss=0, loss_sent=0, loss_sect=0, n_docs=0, n_acc=0, RMSE=0, accuracy=0, F1sect={},
                  n_correct=0, r1=0, r2=0, rl=0, stat_file_dir=None, print_traj=False):
         self.loss = loss
         self.loss_sect = loss_sect
@@ -191,20 +191,21 @@ class Statistics(object):
         self.r2 = r2
         self.rl = rl
         self.RMSE = RMSE
-        self.F1sect = F1sect.copy()
-        self.n_f1_sep = F1sect.copy()
-
-        for key, val in F1sect.items():
-            if val != -1:
-                self.n_f1_sep[key] = val[1]
-            if val == -1:
-                self.n_f1_sep[key] = 0
-
-        for key, val in F1sect.items():
-            if val != -1:
-                self.F1sect[key] = val[0]
-            if val == -1:
-                self.F1sect[key] = 0
+        self.accuracy = accuracy
+        # self.F1sect = F1sect.copy()
+        # self.n_f1_sep = F1sect.copy()
+        #
+        # for key, val in F1sect.items():
+        #     if val != -1:
+        #         self.n_f1_sep[key] = val[1]
+        #     if val == -1:
+        #         self.n_f1_sep[key] = 0
+        #
+        # for key, val in F1sect.items():
+        #     if val != -1:
+        #         self.F1sect[key] = val[0]
+        #     if val == -1:
+        #         self.F1sect[key] = 0
 
         self.start_time = time.time()
         if stat_file_dir is not None:
@@ -272,26 +273,29 @@ class Statistics(object):
         self.loss_sect += stat.loss_sect
 
         self.RMSE += stat.RMSE
+        self.accuracy += stat.accuracy
+        self.n_docs += stat.n_docs
+        self.n_acc += stat.n_acc
+
         # section-wise
         # self.F1sect += stat.F1sect
         # self.F1sect = np.add(self.F1sect, stat.F1sect)
 
-        for key, val in stat.F1sect.items():
-            if key in self.F1sect.keys():
-                self.F1sect[key] += val
-            else:
-                self.F1sect[key] = val
-
-        for key, val in stat.n_f1_sep.items():
-            if key in self.n_f1_sep.keys():
-                self.n_f1_sep[key] += val
-            else:
-                self.n_f1_sep[key] = val
+        # for key, val in stat.F1sect.items():
+        #     if key in self.F1sect.keys():
+        #         self.F1sect[key] += val
+        #     else:
+        #         self.F1sect[key] = val
+        #
+        # for key, val in stat.n_f1_sep.items():
+        #     if key in self.n_f1_sep.keys():
+        #         self.n_f1_sep[key] += val
+        #     else:
+        #         self.n_f1_sep[key] = val
 
         # self.F1sect = np.add(self.F1sect, stat.F1sect)
 
-        self.n_docs += stat.n_docs
-        self.n_acc += stat.n_acc
+        # self.n_acc += stat.n_acc
 
         # import pdb;
         # pdb.set_trace()
@@ -358,7 +362,7 @@ class Statistics(object):
             # foveral, f11, f12, f13, f14, f15 = self.self_get_f1_sect()
             logger.info(
                 (
-                        "Step %s; mse_sent: %4.2f (%4.2f/%d) + xent_sect: %4.2f = mlt: %4.2f (RMSE-sent: %4.2f) "
+                        "Step %s; mse_sent: %4.2f (%4.2f/%d) + xent_sect: %4.2f = mlt: %4.2f (RMSE-sent: %4.4f, ACC: %4.4f) "
                         # "F1-sect: %4.2f ([0] %4.2f, "
                         # "[1] %4.2f, [2] %4.2f, [3] %4.2f, [4] %4.2f)); " +
                         "lr: %7.7f; %3.0f docs/s; %6.0f sec")
@@ -369,6 +373,7 @@ class Statistics(object):
                    self.xent_sect(),
                    self.total_loss(),
                    self._get_rmse_sent(),
+                   self._get_acc_sect(),
                    # foveral,
                    # f11,
                    # f12,
@@ -396,10 +401,11 @@ class Statistics(object):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/total_loss", self.total_loss(), step)
-        writer.add_scalar(prefix + "/RMSE", self._get_rmse_sent(), step)
+        # writer.add_scalar(prefix + "/RMSE", self._get_rmse_sent(), step)
         # writer.add_scalar(prefix + "/F1_sect", self._get_f1_sect()[0], step)
-        writer.add_scalar(prefix + "/mse_sent", self.mse_sent(), step)
+        # writer.add_scalar(prefix + "/mse_sent", self.mse_sent(), step)
         writer.add_scalar(prefix + "/xent_sect", self.xent_sect(), step)
+        writer.add_scalar(prefix + "/ACC", self._get_acc_sect(), step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
         if report_rl:
             writer.add_scalar(prefix + "/Rouge-1", self.r1, step)
@@ -427,3 +433,8 @@ class Statistics(object):
         )
         self.validation_file.flush()
         os.fsync(self.validation_file)
+
+    def _get_acc_sect(self):
+        if self.n_docs == 0:
+            return 0
+        return self.accuracy / self.n_acc

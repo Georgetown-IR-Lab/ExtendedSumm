@@ -51,6 +51,7 @@ if __name__ == '__main__':
     parser.add_argument("-share_emb", type=str2bool, nargs='?', const=True, default=False)
     parser.add_argument("-finetune_bert", type=str2bool, nargs='?', const=True, default=True)
     parser.add_argument("-dec_dropout", default=0.2, type=float)
+    parser.add_argument("-alpha_mtl", default=0.4, type=float)
     parser.add_argument("-dec_layers", default=6, type=int)
     parser.add_argument("-dec_hidden_size", default=768, type=int)
     parser.add_argument("-dec_heads", default=8, type=int)

@@ -19,7 +19,7 @@ server() {
 DATA_PATH=/disk1/sajad/datasets/sci/csp/bert-files/5l-rg/
 
 MAX_POS=1024
-MODEL_PATH=/disk1/sajad/sci-trained-models/presum/csp-bertsum-multi-al75/
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/csp-bertsum-multi-al0/
 
 
 rm -r $MODEL_PATH
@@ -42,4 +42,5 @@ python train.py -task ext \
                 -use_interval true \
                 -warmup_steps 10000 \
                 -max_pos $MAX_POS \
+                -alpha_mtl 0 \
                 -section_prediction
