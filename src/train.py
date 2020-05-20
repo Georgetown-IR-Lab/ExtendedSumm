@@ -149,7 +149,7 @@ if __name__ == '__main__':
             # print('joint: ' + str(args.section_prediction))
             train_ext(args, device_id, args.section_prediction)
         elif (args.mode == 'validate'):
-            validate_ext(args, device_id, args.section_prediction)
+            validate_ext(args, device_id)
         if (args.mode == 'test'):
             cp = args.test_from
             try:

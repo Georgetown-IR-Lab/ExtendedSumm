@@ -331,8 +331,6 @@ class Statistics(object):
         """ compute cross entropy """
         if (self.n_docs == 0):
             return 0
-        # if float(('%4.6f')%(self.loss_sent / self.n_docs)) == 0:
-        #     import pdb;pdb.set_trace()
         return self.loss_sent / self.n_docs
 
     def xent_sect(self):
@@ -374,12 +372,6 @@ class Statistics(object):
                    self.total_loss(),
                    self._get_rmse_sent(),
                    self._get_acc_sect(),
-                   # foveral,
-                   # f11,
-                   # f12,
-                   # f13,
-                   # f14,
-                   # f15,
                    learning_rate,
                    self.n_docs / (t + 1e-5),
                    time.time() - start))
@@ -401,9 +393,9 @@ class Statistics(object):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/total_loss", self.total_loss(), step)
-        # writer.add_scalar(prefix + "/RMSE", self._get_rmse_sent(), step)
+        writer.add_scalar(prefix + "/RMSE", self._get_rmse_sent(), step)
         # writer.add_scalar(prefix + "/F1_sect", self._get_f1_sect()[0], step)
-        # writer.add_scalar(prefix + "/mse_sent", self.mse_sent(), step)
+        writer.add_scalar(prefix + "/mse_sent", self.mse_sent(), step)
         writer.add_scalar(prefix + "/xent_sect", self.xent_sect(), step)
         writer.add_scalar(prefix + "/ACC", self._get_acc_sect(), step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
@@ -435,6 +427,7 @@ class Statistics(object):
         os.fsync(self.validation_file)
 
     def _get_acc_sect(self):
-        if self.n_docs == 0:
+        if self.n_acc == 0:
             return 0
+
         return self.accuracy / self.n_acc

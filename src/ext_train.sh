@@ -16,10 +16,10 @@ server() {
 }
 
 #DATA_PATH=/disk1/sajad/datasets/sci/arxiv//bert-files/5l-rg/
-DATA_PATH=/disk1/sajad/datasets/sci/csp/bert-files/5l-rg/
+DATA_PATH=/disk1/sajad/datasets/sci/csp/bert-files/5l-rg-labels/
 
 MAX_POS=1024
-MODEL_PATH=/disk1/sajad/sci-trained-models/presum/csp-bertsum-multi-al0/
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/csp-bertsum-rg-last/
 
 
 rm -r $MODEL_PATH
@@ -34,13 +34,14 @@ python train.py -task ext \
                 -lr 2e-3 \
                 -visible_gpus 0,1 \
                 -report_every 50 \
-                -save_checkpoint_steps 8000 \
-                -batch_size 140 \
-                -train_steps 152000 \
-                -accum_count 2 \
+                -save_checkpoint_steps 10000 \
+                -batch_size 3000 \
+                -test_batch_size 1 \
+                -train_steps 180000 \
                 -log_file ../logs/bertmulti_cspubsum \
                 -use_interval true \
                 -warmup_steps 10000 \
                 -max_pos $MAX_POS \
-                -alpha_mtl 0 \
-                -section_prediction
+                -alpha_mtl 0.1 \
+                -accum_count 2
+#                -section_prediction \

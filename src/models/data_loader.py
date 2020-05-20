@@ -35,12 +35,13 @@ class Batch(object):
             pre_segs = [x[2] for x in data]
             pre_clss = [x[3] for x in data]
             pre_src_sent_labels = [x[4] for x in data]
-            sent_sect_labels = [x[5] for x in data]
-            labelize(sent_sect_labels)
+            pre_sent_labels = [x[5] for x in data]
+            sent_sect_labels = [x[6] for x in data]
+            # labelize(sent_sect_labels)
             if is_test:
-                sent_sect_labels = [x[7] for x in data]
-                labelize(sent_sect_labels)
-                paper_id = [x[8] for x in data]
+                sent_sect_labels = [x[8] for x in data]
+                # labelize(sent_sect_labels)
+                paper_id = [x[9] for x in data]
 
             src = torch.tensor(self._pad(pre_src, 0))
             tgt = torch.tensor(self._pad(pre_tgt, 0))
@@ -51,6 +52,7 @@ class Batch(object):
 
             clss = torch.tensor(self._pad(pre_clss, -1))
             src_sent_labels = torch.tensor(self._pad(pre_src_sent_labels, 0))
+            sent_labels = torch.tensor(self._pad(pre_sent_labels, 0))
             sent_sect_labels = torch.tensor(self._pad(sent_sect_labels, 0))
             mask_cls = 1 - (clss == -1)
             clss[clss == -1] = 0
@@ -58,6 +60,7 @@ class Batch(object):
             setattr(self, 'clss', clss.to(device))
             setattr(self, 'mask_cls', mask_cls.to(device))
             setattr(self, 'src_sent_labels', src_sent_labels.to(device))
+            setattr(self, 'sent_labels', sent_labels.to(device))
 
             setattr(self, 'src', src.to(device))
             setattr(self, 'tgt', tgt.to(device))
@@ -206,6 +209,8 @@ class DataIterator(object):
         src = ex['src']
         tgt = ex['tgt'][:self.args.max_tgt_len][:-1] + [2]
         src_sent_labels = ex['src_sent_labels']
+        sent_labels = ex['sent_labels']
+
         segs = ex['segs']
         if (not self.args.use_interval):
             segs = [0] * len(segs)
@@ -224,14 +229,15 @@ class DataIterator(object):
         segs = segs[:self.args.max_pos]
         max_sent_id = bisect.bisect_left(clss, self.args.max_pos)
         src_sent_labels = src_sent_labels[:max_sent_id]
+        sent_labels = sent_labels[:max_sent_id]
         clss = clss[:max_sent_id]
         src_txt = src_txt[:max_sent_id]
         sent_sect_labels = sent_sect_labels[:max_sent_id]
 
         if (is_test):
-            return src, tgt, segs, clss, src_sent_labels, src_txt, tgt_txt, sent_sect_labels, paper_id
+            return src, tgt, segs, clss, src_sent_labels, sent_labels, src_txt, tgt_txt, sent_sect_labels, paper_id
         else:
-            return src, tgt, segs, clss, src_sent_labels, sent_sect_labels
+            return src, tgt, segs, clss, src_sent_labels, sent_labels, sent_sect_labels
 
     def batch_buffer(self, data, batch_size):
         minibatch, size_so_far = [], 0
@@ -322,6 +328,7 @@ class TextDataloader(object):
         pdb.set_trace()
         tgt = ex['tgt'][:self.args.max_tgt_len][:-1] + [2]
         src_sent_labels = ex['src_sent_labels']
+        sent_labels = ex['sent_labels']
         segs = ex['segs']
         if (not self.args.use_interval):
             segs = [0] * len(segs)
@@ -334,13 +341,14 @@ class TextDataloader(object):
         segs = segs[:self.args.max_pos]
         max_sent_id = bisect.bisect_left(clss, self.args.max_pos)
         src_sent_labels = src_sent_labels[:max_sent_id]
+        sent_labels = sent_labels[:max_sent_id]
         clss = clss[:max_sent_id]
         # src_txt = src_txt[:max_sent_id]
 
         if (is_test):
-            return src, tgt, segs, clss, src_sent_labels, src_txt, tgt_txt
+            return src, tgt, segs, clss, src_sent_labels, sent_labels, src_txt, tgt_txt
         else:
-            return src, tgt, segs, clss, src_sent_labels
+            return src, tgt, segs, clss, src_sent_labels, sent_labels
 
     def batch_buffer(self, data, batch_size):
         minibatch, size_so_far = [], 0

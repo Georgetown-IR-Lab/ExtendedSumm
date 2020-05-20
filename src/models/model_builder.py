@@ -156,9 +156,10 @@ class ExtSummarizer(nn.Module):
             for p in self.sentence_predictor.parameters():
                 if p.dim() > 1:
                     xavier_uniform_(p)
-            for p in self.section_predictor.parameters():
-                if p.dim() > 1:
-                    xavier_uniform_(p)
+            if self.is_joint:
+                for p in self.section_predictor.parameters():
+                    if p.dim() > 1:
+                        xavier_uniform_(p)
 
 
 
@@ -236,12 +237,12 @@ class SentenceExtLayer(nn.Module):
 class SectionExtLayer(nn.Module):
     def __init__(self):
         super(SectionExtLayer, self).__init__()
-        self.wo_2 = nn.Linear(768, 3, bias=True)
+        self.wo_2 = nn.Linear(768, 5, bias=True)
         self.dropout = nn.Dropout(0.5)
-        self.leakyReLu = nn.LeakyReLU()
+        # self.leakyReLu = nn.LeakyReLU()
 
     def forward(self, x, mask):
-        sent_sect_scores = self.dropout(self.leakyReLu(self.wo_2(x)))
+        sent_sect_scores = self.dropout(self.wo_2(x))
         sent_sect_scores = sent_sect_scores.squeeze(-1) * mask.unsqueeze(2).expand_as(sent_sect_scores).float()
 
         return sent_sect_scores

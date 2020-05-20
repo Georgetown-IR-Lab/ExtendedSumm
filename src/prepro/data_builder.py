@@ -614,7 +614,7 @@ class BertData():
         self.cls_vid = self.tokenizer.vocab[self.cls_token]
         self.pad_vid = self.tokenizer.vocab[self.pad_token]
 
-    def preprocess(self, src, tgt, sent_labels, use_bert_basic_tokenizer=False, is_test=False):
+    def preprocess(self, src, tgt, sent_rg_scores, sent_labels=None, use_bert_basic_tokenizer=False, is_test=False):
 
         if ((not is_test) and len(src) == 0):
             return None
@@ -623,15 +623,18 @@ class BertData():
 
         idxs = [i for i, s in enumerate(src)]
 
-        # _sent_labels = [0] * len(src)
-        # for l in sent_labels:
-        #     _sent_labels[l] = 1
+        _sent_labels = [0] * len(src)
+        for l in sent_labels:
+            _sent_labels[l] = 1
 
-        _sent_labels = sent_labels
+        _sent_rg_scores = sent_rg_scores
+        # _sent_rg_scores = sent_rg_scores
 
         src = [src[i] for i in idxs]
+        sent_rg_scores = [_sent_rg_scores[i] for i in idxs]
         sent_labels = [_sent_labels[i] for i in idxs]
         src = src[:self.args.max_src_nsents]
+        sent_rg_scores = sent_rg_scores
         sent_labels = sent_labels
 
         if ((not is_test) and len(src) < self.args.min_src_nsents):
@@ -653,6 +656,7 @@ class BertData():
             else:
                 segments_ids += s * [1]
         cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
+        sent_rg_scores = sent_rg_scores[:len(cls_ids)]
         sent_labels = sent_labels[:len(cls_ids)]
 
         tgt_subtokens_str = '[unused0] ' + ' [unused2] '.join(
@@ -667,7 +671,7 @@ class BertData():
         tgt_txt = '<q>'.join([' '.join(tt) for tt in tgt])
         src_txt = [original_src_txt[i] for i in idxs]
 
-        return src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt
+        return src_subtoken_idxs, sent_rg_scores, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt
 
 
 def format_to_bert(args):
@@ -951,13 +955,13 @@ def format_to_bert_cspubsum(args):
         pt.append(d)
         ptctr += 1
         if ptctr > 2000:
-            _format_to_bert_cspubsum((datasets[0], pt, args, '/disk1/sajad/datasets/sci/csp/bert-files/5l-rg/' + datasets[0] + '.' + str(part) + '.pt', kws))
+            _format_to_bert_cspubsum((datasets[0], pt, args, '/disk1/sajad/datasets/sci/csp/bert-files/5l-rg-labels/' + datasets[0] + '.' + str(part) + '.pt', kws))
             part += 1
             ptctr = 0
             pt.clear()
     if len(pt) > 0:
         _format_to_bert_cspubsum((datasets[0], pt, args,
-                                  '/disk1/sajad/datasets/sci/csp/bert-files/5l-rg/' + datasets[0] + '.' + str(part) + '.pt',
+                                  '/disk1/sajad/datasets/sci/csp/bert-files/5l-rg-labels/' + datasets[0] + '.' + str(part) + '.pt',
                                   kws))
 
 
@@ -1019,8 +1023,8 @@ def _format_to_bert_cspubsum(param):
                     # print(i)
                     if i == len(source) - 1:
                         token_ctr = 0
-                        # sent_labels = greedy_selection(segment, tgt, 3)
-                        sent_labels = segment_rg_scores(segment, tgt)
+                        sent_labels = greedy_selection(segment, tgt, 2)
+                        sent_rg_scores = segment_rg_scores(segment, tgt)
                         # segment_labels.append(sent[2])
                         # segment_section.append(sent[1])
                         if (args.lower):
@@ -1028,25 +1032,25 @@ def _format_to_bert_cspubsum(param):
                             tgt = [' '.join(s).lower().split() for s in tgt]
 
                         try:
-                            b_data = bert.preprocess(segment.copy(), tgt, sent_labels.copy(),
+                            b_data = bert.preprocess(segment.copy(), tgt, sent_rg_scores.copy(), sent_labels.copy(),
                                                      use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
                                                      is_test=is_test)
                         except:
                             import pdb;pdb.set_trace()
                         if (b_data is None):
                             continue
-                        src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
+                        src_subtoken_idxs, sent_rg_scores, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
                         try:
                             assert len(segment_labels) == len(
-                                sent_labels), "Number of segment_sent and section_sents should be the same"
+                                sent_rg_scores), "Number of segment_sent and section_sents should be the same"
                             assert len(cls_ids) == len(
-                                sent_labels), "Number of segment_sent and section_sents should be the same"
+                                sent_rg_scores), "Number of segment_sent and section_sents should be the same"
                         except:
                             import pdb;
                             pdb.set_trace()
 
                         b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
-                                       "src_sent_labels": sent_labels.copy(), "segs": segments_ids, 'clss': cls_ids,
+                                       "src_sent_labels": sent_rg_scores.copy(), "sent_labels": sent_labels.copy(), "segs": segments_ids, 'clss': cls_ids,
                                        'src_txt': src_txt, "tgt_txt": tgt_txt, "paper_id": paper_id,
                                        "sent_sect_labels": segment_section.copy()}
 
@@ -1054,6 +1058,7 @@ def _format_to_bert_cspubsum(param):
                         segment_sent_num.clear()
                         segment.clear()
                         segment_labels.clear()
+                        sent_labels.clear()
                         segment_section.clear()
 
 
@@ -1065,8 +1070,8 @@ def _format_to_bert_cspubsum(param):
                     # import pdb;pdb.set_trace()
                     i = i - 1
                     token_ctr = 0
-                    # sent_labels = greedy_selection(segment, tgt, 3)
-                    sent_labels = segment_rg_scores(segment, tgt)
+                    sent_labels = greedy_selection(segment, tgt, 2)
+                    sent_rg_scores = segment_rg_scores(segment, tgt)
                     # segment_labels.append(sent[2])
                     # segment_section.append(_get_section_id(sent[1]))
                     if (args.lower):
@@ -1082,7 +1087,7 @@ def _format_to_bert_cspubsum(param):
                     if len(segment) != len(segment_section):
                         import pdb;pdb.set_trace()
 
-                    b_data = bert.preprocess(segment.copy(), tgt, sent_labels.copy(),
+                    b_data = bert.preprocess(segment.copy(), tgt, sent_rg_scores.copy(), sent_labels.copy(),
                                              use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
                                              is_test=is_test)
 
@@ -1090,25 +1095,25 @@ def _format_to_bert_cspubsum(param):
                     # b_data = bert.preprocess(source, tgt, sent_labels, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer)
                     if (b_data is None):
                         continue
-                    src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
+                    src_subtoken_idxs, sent_rg_scores, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
 
-                    if len(cls_ids) != len(sent_labels):
+                    if len(cls_ids) != len(sent_rg_scores):
                         import pdb;pdb.set_trace()
 
                     assert len(segment_section) == len(
                         segment_labels), "Number of segment_section and segment_labels should be the same"
                     assert len(cls_ids) == len(
-                        sent_labels), "Number of cls_ids and sent_labels should be the same"
+                        sent_rg_scores), "Number of cls_ids and sent_labels should be the same"
                     assert len(cls_ids) == len(
                         segment_section), "Number of cls_ids and segment_section should be the same"
-
                     b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
-                                   "src_sent_labels": sent_labels.copy(), "segs": segments_ids, 'clss': cls_ids,
+                                   "src_sent_labels": sent_rg_scores.copy(), "sent_labels":sent_labels.copy(), "segs": segments_ids, 'clss': cls_ids,
                                    'src_txt': src_txt, "tgt_txt": tgt_txt, "paper_id": paper_id,
                                    "sent_sect_labels": segment_section.copy()}
                     datasets.append(b_data_dict.copy())
                     segment_sent_num.clear()
                     segment.clear()
+                    sent_labels.clear()
                     segment_section.clear()
                     segment_labels.clear()
                 i += 1

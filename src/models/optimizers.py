@@ -177,7 +177,7 @@ class Optimizer(object):
             for op in self.optimizer.optimizers:
                 op.param_groups[0]['lr'] = self.learning_rate
 
-    def step(self, report_stats):
+    def step(self, report_stats=None):
         """Update the model parameters based on current gradients.
 
         Optionally, will employ gradient modification or update learning

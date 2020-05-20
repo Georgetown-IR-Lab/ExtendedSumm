@@ -66,7 +66,6 @@ def build_trainer(args, device_id, model, optim):
 class Trainer(object):
     """
     Class that controls the training process.
-
     Args:
             model(:py:class:`onmt.models.model.NMTModel`): translation model
                 to train
@@ -106,10 +105,11 @@ class Trainer(object):
         self.valid_rgls = []
         # self.loss = torch.nn.BCELoss(reduction='none')
         self.loss = torch.nn.MSELoss(reduction='none')
+        self.bin_loss = torch.nn.BCELoss(reduction='none')
         self.loss_sect = torch.nn.CrossEntropyLoss(reduction='none')
         self.min_val_loss = 100000
         self.min_rl = -100000
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=2)
         assert grad_accum_count > 0
         # Set model in training mode.
         if (model):
@@ -120,7 +120,6 @@ class Trainer(object):
         The main training loops.
         by iterating over training data (i.e. `train_iter_fct`)
         and running validation (i.e. iterating over `valid_iter_fct`
-
         Args:
             train_iter_fct(function): a function that returns the train
                 iterator. e.g. something like
@@ -129,7 +128,6 @@ class Trainer(object):
             train_steps(int):
             valid_steps(int):
             save_checkpoint_steps(int):
-
         Return:
             None
         """
@@ -193,7 +191,7 @@ class Trainer(object):
                         if (step % self.save_checkpoint_steps == 0 and self.gpu_rank == 0):
                             self._save(step)
 
-                        if step % 2500 == 0:  # Validation
+                        if step % 5000 == 0:  # Validation
                             logger.info('----------------------------------------')
                             logger.info('Start evaluating on evaluation set... ')
                             val_stat, best_model_save = self.validate_rouge(valid_iter_fct, step,
@@ -259,6 +257,7 @@ class Trainer(object):
             for batch in valid_iter:
                 src = batch.src
                 labels = batch.src_sent_labels
+                sent_labels = batch.sent_labels
                 segs = batch.segs
                 clss = batch.clss
                 mask = batch.mask_src
@@ -274,23 +273,17 @@ class Trainer(object):
                     loss_sent = self.loss(sent_scores, labels.float())
                     loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
 
-                    # loss_sent = torch.sum((loss_sent * mask.float()), dim=1)
                     loss_sent = (loss_sent * mask.float()).sum()
-                    # loss_sent = (loss_sent / torch.sum(mask, dim=1).float())
-                    # loss_sent = loss_sent.float().mean()
-
-                    # loss_sect = (loss_sect * mask.float()).sum(dim=1)
                     loss_sect = (loss_sect * mask.float()).sum()
-                    # loss_sect = (loss_sect / torch.sum(mask, dim=1).float()).mean()
 
-                    # loss_sent = self.alpha * loss_sent
-                    # loss_sect = (1 - self.alpha) * loss_sect
+                    loss_sent = self.alpha * loss_sent
+                    loss_sect = (1 - self.alpha) * loss_sect
 
                     loss_sent = loss_sent
                     loss_sect = loss_sect
 
-                    # loss = loss_sent + loss_sect
-                    loss = loss_sect
+                    loss = loss_sent + loss_sect
+                    # loss = loss_sect
 
                     batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
                                              loss_sect=float(loss_sect.cpu().data.numpy().sum()),
@@ -299,7 +292,7 @@ class Trainer(object):
                                              n_acc=batch.batch_size,
                                              RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
                                              accuracy=self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
-                                                                       task='sent_sect'))
+                                                                         task='sent_sect'))
 
                 else:
                     sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
@@ -338,7 +331,7 @@ class Trainer(object):
                     else:
                         _pred.append(candidate)
 
-                    if (len(_pred) == 4):
+                    if (len(_pred) == 3):
                         break
 
                 _pred = '<q>'.join(_pred)
@@ -364,60 +357,6 @@ class Trainer(object):
                 best_model_saved = True
 
         return stats, best_model_saved
-
-    # def validate(self, valid_iter_fct, step=0):
-    #     """ Validate model.
-    #         valid_iter: validate data iterator
-    #     Returns:
-    #         :obj:`nmt.Statistics`: validation loss statistics
-    #     """
-    #     # Set model in validating mode.
-    #     self.model.eval()
-    #     stats = Statistics()
-    #     best_model_saved = False
-    #     valid_iter = valid_iter_fct()
-    #     with torch.no_grad():
-    #         for batch in valid_iter:
-    #             src = batch.src
-    #             labels = batch.src_sent_labels
-    #             segs = batch.segs
-    #             clss = batch.clss
-    #             mask = batch.mask_src
-    #             mask_cls = batch.mask_cls
-    #             sent_sect_labels = batch.sent_sect_labels
-    #
-    #             if self.is_joint:
-    #                 sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-    #                 loss_sent = self.loss(sent_scores, labels.float())
-    #                 loss_sect = self.loss_sect(sent_sect_scores.permute(0,2,1), sent_sect_labels)
-    #                 # for deep_slice in range(sent_sect_scores.size(1)):
-    #                 #     loss_sect += self.loss_sect(sent_sect_scores[:, deep_slice, :], sent_sect_labels[:, deep_slice])
-    #                 loss_sect = (loss_sect * mask.float()).sum()
-    #                 loss_sent = (loss_sent * mask.float()).sum()
-    #                 loss_sent = self.alpha * loss_sent
-    #                 loss_sect = (1 - self.alpha) * loss_sect
-    #                 loss = loss_sent + loss_sect
-    #
-    #                 # print(float(loss.cpu().data.numpy()))
-    #                 batch_stats = Statistics(loss=float(loss.cpu().data.numpy()),
-    #                                          loss_sect=float(loss_sect.cpu().data.numpy()),
-    #                                          loss_sent=float(loss_sent.cpu().data.numpy()), n_docs=len(labels),
-    #                                          print_traj=True)
-    #
-    #
-    #             else:  # not joint
-    #                 sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-    #                 loss = self.loss(sent_scores, labels.float())
-    #                 loss = (loss * mask.float()).sum()
-    #                 batch_stats = Statistics(float(loss.cpu().data.numpy()), n_docs=len(labels))
-    #             stats.update(batch_stats)
-    #
-    #         self.valid_trajectories.append(stats.xent())
-    #         if self.valid_trajectories[-1] < self.min_val_loss:
-    #             self.min_val_loss = self.valid_trajectories[-1]
-    #             best_model_saved = True
-    #         self._report_step(self.optim.learning_rate, step, valid_stats=stats)
-    #         return stats, best_model_saved
 
     def test(self, test_iter, step, cal_lead=False, cal_oracle=False):
         """ Validate model.
@@ -478,9 +417,14 @@ class Trainer(object):
                     loss_sent = self.alpha * loss_sent
                     loss_sect = (1 - self.alpha) * loss_sect
                     loss = loss_sent + loss_sect
+                    acc = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                                                         task='sent_sect')
                     batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), loss_sect=loss_sect,
                                              loss_sent=loss_sent,
-                                             n_docs=len(labels))
+                                             n_docs=len(labels),
+                                             accuracy= acc,
+                                             n_acc=batch.batch_size
+                                             )
 
                 else:
                     sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
@@ -504,8 +448,6 @@ class Trainer(object):
 
             for paper_id, sent_scores in sent_scores_whole.items():
                 selected_ids = np.argsort(-sent_scores, 1)[0]
-                # selected_ids = np.sort(selected_ids,1)
-                # for i, idx in enumerate(selected_ids):
                 _pred = []
 
                 for j in selected_ids:
@@ -516,24 +458,20 @@ class Trainer(object):
                     else:
                         _pred.append(candidate)
 
-                    if (len(_pred) == 4):
+                    if (len(_pred) == 3):
                         break
 
                 _pred = '<q>'.join(_pred)
                 if (self.args.recall_eval):
                     _pred = ' '.join(_pred.split()[:len(paper_tgts[paper_id].split())])
 
-                # pred.append(_pred)
-                # if paper_id in preds.keys():
                 preds[paper_id] = _pred
-                # else:
-                #     preds[paper_id] = _pred + ' '
                 golds[paper_id] = paper_tgts[paper_id]
 
-                # gold.append(batch.tgt_str[i])
-        for id, pred in preds.items():
-            save_pred.write(pred.strip() + '\n')
-            save_gold.write(golds[id].strip() + '\n')
+            for id, pred in preds.items():
+                save_pred.write(pred.strip() + '\n')
+                save_gold.write(golds[id].strip() + '\n')
+
         print(f'Gold: {gold_path}')
         print(f'Prediction: {can_path}')
 
@@ -563,29 +501,22 @@ class Trainer(object):
             src = batch.src
             labels = batch.src_sent_labels
             sent_sect_labels = batch.sent_sect_labels
+            sent_bin_labels = batch.sent_labels
             segs = batch.segs
             clss = batch.clss
             mask = batch.mask_src
             mask_cls = batch.mask_cls
             if self.is_joint:
                 sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-                loss_sent = self.loss(sent_scores, labels.float())
-                loss_sent = (loss_sent * mask.float()).sum(dim=1)
-                loss_sent = (loss_sent / loss_sent.numel()).sum()
 
-                # loss_sent = torch.sum((loss_sent * mask.float()), dim=1)
-                # loss_sent = (loss_sent / torch.sum(mask, dim=1).float())
-                # loss_sent = loss_sent.float().mean()
+                loss_sent = self.loss(sent_scores, labels.float())
+                # loss_sent = self.bin_loss(sent_scores, sent_bin_labels.float())
+                loss_sent = (loss_sent * mask.float()).sum()
+                loss_sent = loss_sent / loss_sent.numel()
 
                 loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
-                # loss_sect = (loss_sect * mask.float()).sum()
-                # loss_sect = (loss_sect * mask.float()).sum(dim=1)
                 loss_sect = (loss_sect * mask.float()).sum()
-                # loss_sent = (loss_sent / torch.sum(mask, dim=1).float()).sum()
-
-                # loss_sect = (loss_sect / loss_sect.numel()).sum()
-
-                # loss_sect = (loss_sect / torch.sum(mask, dim=1).float()).mean()
+                loss_sect = loss_sect / loss_sect.numel()
 
                 # L2 reg
                 # reg = 0
@@ -594,11 +525,11 @@ class Trainer(object):
 
                 loss_sent = self.alpha * loss_sent
                 loss_sect = (1 - self.alpha) * (loss_sect)
-                loss = loss_sect
-                # loss = loss_sent + loss_sect
-                acc = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
-                                                                   task='sent_sect')
+                loss = loss_sent + loss_sect
 
+
+                acc = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                         task='sent_sect')
                 batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
                                          loss_sect=float(loss_sect.cpu().data.numpy().sum()),
                                          loss_sent=float(loss_sent.cpu().data.numpy().sum()), n_docs=normalization,
@@ -684,11 +615,9 @@ class Trainer(object):
     def _maybe_gather_stats(self, stat):
         """
         Gather statistics in multi-processes cases
-
         Args:
             stat(:obj:onmt.utils.Statistics): a Statistics object to gather
                 or None (it returns None in this case)
-
         Returns:
             stat: the updated (or unchanged) stat object
         """
@@ -744,7 +673,7 @@ class Trainer(object):
             tp = ((labels * pred).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
             fp = (((1 - labels) * (pred)).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
             fn = (((labels) * (1 - pred)).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
-            tn = (((1-labels) * (1 - pred)).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
+            tn = (((1 - labels) * (1 - pred)).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
             # epsilon = 1e-7
             # precision = tp / (tp + fp + epsilon)
             # recall = tp / (tp + fn + epsilon)
@@ -757,34 +686,6 @@ class Trainer(object):
             acc = (((pred == labels) * mask.cuda()).sum(dim=1)).to(dtype=torch.float) / \
                   mask.sum(dim=1).to(dtype=torch.float)
             return acc.sum().item()
-
-            # pos = torch.ones(labels.shape[0], labels.shape[1]).to('cuda')
-            # neg = torch.zeros(labels.shape[0], labels.shape[1]).to('cuda')
-            # # 0 as positive: wherever 0-->1, others 0; pass in labels and preds
-            # f10, f11, f12, f13, f14 = -1, -1, -1, -1, -1
-            # if 0 in labels:
-            #     f10 = _compute_f1(torch.where(labels == 0, pos, neg), torch.where(pred == 0, pos, neg))
-            # if 1 in labels:
-            #     f11 = _compute_f1(torch.where(labels == 1, pos, neg), torch.where(pred == 1, pos, neg))
-            # if 2 in labels:
-            #     f12 = _compute_f1(torch.where(labels == 2, pos, neg), torch.where(pred == 2, pos, neg))
-            # if 3 in labels:
-            #     f13 = _compute_f1(torch.where(labels == 3, pos, neg), torch.where(pred == 3, pos, neg))
-            # if 4 in labels:
-            #     f14 = _compute_f1(torch.where(labels == 4, pos, neg), torch.where(pred == 4, pos, neg))
-            #
-            # # return {'f0': (f10.sum().item(), sent_scores.size(0)) if f10 != -1 else -1,
-            # #         'f1': (f11.sum().item(), sent_scores.size(0)) if f11 != -1 else -1,
-            # #         'f2': (f12.sum().item(), sent_scores.size(0)) if f12 != -1 else -1,
-            # #         'f3': (f13.sum().item(), sent_scores.size(0)) if f13 != -1 else -1,
-            # #         'f4': (f14.sum().item(), sent_scores.size(0)) if f14 != -1 else -1}
-            # return {'f0': (1,1),
-            #         'f1': (1,1),
-            #         'f2': (1,1),
-            #         'f3': (1,1),
-            #         'f4': (1,1)}
-
-
 
         else:
             mseLoss = self.loss(sent_scores.float(), labels.float())
