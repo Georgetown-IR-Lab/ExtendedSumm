@@ -12,7 +12,9 @@ import signal
 import time
 
 import torch
-from pytorch_transformers import BertTokenizer
+# from pytorch_transformers import BertTokenizer
+from transformers import BertTokenizer
+from apex import amp
 
 import distributed
 from models import data_loader, model_builder
@@ -186,7 +188,8 @@ def validate(args, device_id, pt, step):
                                         args.batch_size, device,
                                         shuffle=False, is_test=False)
 
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+    # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+    tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused0]'], 'EOS': tokenizer.vocab['[unused1]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused2]']}
 
@@ -212,17 +215,32 @@ def test_abs(args, device_id, pt, step):
             setattr(args, k, opt[k])
     print(args)
 
-    model = AbsSummarizer(args, device, checkpoint)
+    # model = AbsSummarizer(args, device, checkpoint)
+    model = AbsSummarizer(args, device, checkpoint=None)
     model.eval()
-
-    test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
+    def test_iter_fct():
+        return data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
                                        args.test_batch_size, device,
                                        shuffle=False, is_test=True)
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+
+    def train_iter_fct():
+        return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=False),
+                                       args.test_batch_size, device,
+                                       shuffle=False, is_test=True)
+
+    def val_iter_fct():
+        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=False),
+                                       args.test_batch_size, device,
+                                       shuffle=False, is_test=True)
+
+
+    # tokenizer = BertTokenizer.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased', do_lower_case=True)
+    # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+    tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused0]'], 'EOS': tokenizer.vocab['[unused1]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused2]']}
     predictor = build_predictor(args, tokenizer, symbols, model, logger)
-    predictor.translate(test_iter, step)
+    predictor.translate(train_iter_fct, step)
 
 
 def test_text_abs(args, device_id, pt, step):
@@ -246,7 +264,8 @@ def test_text_abs(args, device_id, pt, step):
     test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
                                        args.test_batch_size, device,
                                        shuffle=False, is_test=True)
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+    # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+    tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused0]'], 'EOS': tokenizer.vocab['[unused1]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused2]']}
     predictor = build_predictor(args, tokenizer, symbols, model, logger)
@@ -312,6 +331,10 @@ def train_abs_single(args, device_id):
         return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
                                       shuffle=True, is_test=False)
 
+    def val_iter_fct():
+        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=True), args.test_batch_size, device,
+                                      shuffle=False, is_test=True)
+
     model = AbsSummarizer(args, device, checkpoint, bert_from_extractive)
     if (args.sep_optim):
         optim_bert = model_builder.build_optim_bert(args, model, checkpoint)
@@ -320,9 +343,11 @@ def train_abs_single(args, device_id):
     else:
         optim = [model_builder.build_optim(args, model, checkpoint)]
 
+    model, optimizer = amp.initialize(model, optim[0].optimizer, opt_level="O1")
     logger.info(model)
 
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+    # tokenizer = BertTokenizer.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
+    tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused0]'], 'EOS': tokenizer.vocab['[unused1]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused2]']}
 
@@ -331,4 +356,4 @@ def train_abs_single(args, device_id):
 
     trainer = build_trainer(args, device_id, model, optim, train_loss)
 
-    trainer.train(train_iter_fct, args.train_steps)
+    trainer.train(train_iter_fct, args.train_steps, valid_iter_fct=val_iter_fct)

@@ -5,6 +5,7 @@ Implementation of "Attention is All You Need"
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.utils import checkpoint
 
 from models.encoder import PositionalEncoding
 from models.neural import MultiHeadedAttention, PositionwiseFeedForward, DecoderState
@@ -42,6 +43,30 @@ class TransformerDecoderLayer(nn.Module):
         # it gets TransformerDecoderLayer's cuda behavior automatically.
         self.register_buffer('mask', mask)
 
+    def custom(self, module):
+        def custom_forward(*inputs):
+            # import pdb;pdb.set_trace()
+            output = module(inputs[0], inputs[1], inputs[2],
+                            mask=inputs[3],
+                            layer_cache=inputs[4],
+                            type='self'
+                            )
+            return output
+
+        return custom_forward
+
+    def custom_ctx(self, module):
+        def custom_forward(*inputs):
+            # import pdb;pdb.set_trace()
+            output = module(inputs[0], inputs[1], inputs[2],
+                            mask=inputs[3],
+                            layer_cache=inputs[4],
+                            type='context'
+                            )
+            return output
+
+        return custom_forward
+
     def forward(self, inputs, memory_bank, src_pad_mask, tgt_pad_mask,
                 previous_input=None, layer_cache=None, step=None):
         """
@@ -64,22 +89,44 @@ class TransformerDecoderLayer(nn.Module):
                                       :tgt_pad_mask.size(1)], 0)
         input_norm = self.layer_norm_1(inputs)
         all_input = input_norm
+
         if previous_input is not None:
             all_input = torch.cat((previous_input, input_norm), dim=1)
             dec_mask = None
 
+        # import pdb;pdb.set_trace()
+
+        # query = checkpoint.checkpoint(
+        #     self.custom(self.self_attn),
+        #     all_input, all_input, input_norm,
+        #     dec_mask,
+        #     layer_cache
+        # )
+
         query = self.self_attn(all_input, all_input, input_norm,
-                                     mask=dec_mask,
-                                     layer_cache=layer_cache,
-                                     type="self")
+                               mask=dec_mask,
+                               layer_cache=layer_cache,
+                               type='self')
 
         query = self.drop(query) + inputs
 
         query_norm = self.layer_norm_2(query)
+
+        # mid = checkpoint.checkpoint(
+        #     self.custom_ctx(self.context_attn),
+        #     memory_bank, memory_bank, query_norm,
+        #     src_pad_mask,
+        #     layer_cache,
+        # )
+
+        # import pdb;pdb.set_trace()
+
+
         mid = self.context_attn(memory_bank, memory_bank, query_norm,
-                                      mask=src_pad_mask,
-                                      layer_cache=layer_cache,
-                                      type="context")
+                                  mask=src_pad_mask,
+                                  layer_cache=layer_cache,
+                                  type="context")
+
         output = self.feed_forward(self.drop(mid) + query)
 
         return output, all_input
@@ -142,6 +189,7 @@ class TransformerDecoder(nn.Module):
         self.num_layers = num_layers
         self.embeddings = embeddings
         self.pos_emb = PositionalEncoding(dropout,self.embeddings.embedding_dim)
+        self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
 
 
         # Build TransformerDecoder.
@@ -151,11 +199,26 @@ class TransformerDecoder(nn.Module):
 
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
 
+    def custom(self, module):
+        def custom_forward(*inputs):
+            # import pdb;pdb.set_trace()
+            output = module(inputs[0], inputs[1], inputs[2], inputs[3],
+                            previous_input=inputs[4],
+                            layer_cache=inputs[5],
+                            step=inputs[-2]
+                            )
+            return output[0], output[1]
+
+        return custom_forward
+
     def forward(self, tgt, memory_bank, state, memory_lengths=None,
                 step=None, cache=None,memory_masks=None):
         """
         See :obj:`onmt.modules.RNNDecoderBase.forward()`
+        memory bank: top_vec
         """
+
+        # state = self.init_decoder_state(src, memory_bank)
 
         src_words = state.src
         tgt_words = tgt
@@ -190,14 +253,31 @@ class TransformerDecoder(nn.Module):
             if state.cache is None:
                 if state.previous_input is not None:
                     prev_layer_input = state.previous_layer_inputs[i]
+
+            # output, all_input \
+            #     = self.transformer_layers[i](
+            #     output, src_memory_bank,
+            #     src_pad_mask, tgt_pad_mask,
+            #     previous_input=prev_layer_input,
+            #     layer_cache=state.cache["layer_{}".format(i)]
+            #     if state.cache is not None else None,
+            #     step=step)
+
+            # import pdb;pdb.set_trace()
+            state_cache = state.cache["layer_{}".format(i)] \
+                if state.cache is not None else None
+            # import pdb;pdb.set_trace()
+
             output, all_input \
-                = self.transformer_layers[i](
-                    output, src_memory_bank,
-                    src_pad_mask, tgt_pad_mask,
-                    previous_input=prev_layer_input,
-                    layer_cache=state.cache["layer_{}".format(i)]
-                    if state.cache is not None else None,
-                    step=step)
+                = checkpoint.checkpoint(
+                self.custom(self.transformer_layers[i]),
+                output, src_memory_bank,
+                src_pad_mask, tgt_pad_mask, prev_layer_input,
+                state_cache, step
+            )
+
+            # import pdb;pdb.set_trace()
+
             if state.cache is None:
                 saved_inputs.append(all_input)
 
@@ -211,6 +291,7 @@ class TransformerDecoder(nn.Module):
         if state.cache is None:
             state = state.update_state(tgt, saved_inputs)
 
+        # return output
         return output, state
 
     def init_decoder_state(self, src, memory_bank,

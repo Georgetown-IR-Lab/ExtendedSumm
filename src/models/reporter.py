@@ -50,7 +50,7 @@ class ReportMgrBase(object):
         logger.info(*args, **kwargs)
 
     def report_training(self, step, num_steps, learning_rate,
-                        report_stats, multigpu=False):
+                        report_stats, multigpu=False, is_train=False):
         """
         This is the user-defined batch-level traing progress
         report function.
@@ -72,7 +72,7 @@ class ReportMgrBase(object):
 
         if step % self.report_every == 0:
             self._report_training(
-                step, num_steps, learning_rate, report_stats)
+                step, num_steps, learning_rate, report_stats, is_train=is_train)
             self.progress_step += 1
         return Statistics()
 
@@ -110,13 +110,13 @@ class ReportMgr(ReportMgrBase):
         super(ReportMgr, self).__init__(report_every, start_time)
         self.tensorboard_writer = tensorboard_writer
 
-    def maybe_log_tensorboard(self, stats, prefix, learning_rate, step):
+    def maybe_log_tensorboard(self, stats, prefix, learning_rate, step, is_train=False):
         if self.tensorboard_writer is not None:
             stats.log_tensorboard(
-                prefix, self.tensorboard_writer, learning_rate, step)
+                prefix, self.tensorboard_writer, learning_rate, step, is_train=is_train)
 
     def _report_training(self, step, num_steps, learning_rate,
-                         report_stats):
+                         report_stats, is_train=False):
         """
         See base class method `ReportMgrBase.report_training`.
         """
@@ -127,7 +127,8 @@ class ReportMgr(ReportMgrBase):
         self.maybe_log_tensorboard(report_stats,
                                    "progress",
                                    learning_rate,
-                                   step)
+                                   step,
+                                   is_train=True)
         report_stats = Statistics()
 
         return report_stats
@@ -272,10 +273,19 @@ class Statistics(object):
                time.time() - start))
         sys.stdout.flush()
 
-    def log_tensorboard(self, prefix, writer, learning_rate, step):
+    def set_rl(self, r1, r2, rl):
+        self.r1 = r1
+        self.r2 = r2
+        self.rl = rl
+
+    def log_tensorboard(self, prefix, writer, learning_rate, step, is_train=False):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/xent", self.xent(), step)
+        # if not is_train:
+        #     writer.add_scalar(prefix + "/rg-1", self.rl, step)
+        #     writer.add_scalar(prefix + "/rg-2", self.r2, step)
+        #     writer.add_scalar(prefix + "/rg-l", self.rl, step)
         writer.add_scalar(prefix + "/ppl", self.ppl(), step)
         writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
         writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)

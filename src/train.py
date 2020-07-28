@@ -33,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument("-bert_data_path", default='../bert_data_new/cnndm')
     parser.add_argument("-model_path", default='../models/')
     parser.add_argument("-result_path", default='../results/cnndm')
+    parser.add_argument("-bart_dir_out", default='')
     parser.add_argument("-temp_dir", default='../temp')
 
     parser.add_argument("-batch_size", default=140, type=int)
@@ -52,10 +53,17 @@ if __name__ == '__main__':
     parser.add_argument("-finetune_bert", type=str2bool, nargs='?', const=True, default=True)
     parser.add_argument("-dec_dropout", default=0.2, type=float)
     parser.add_argument("-alpha_mtl", default=0.4, type=float)
+
     parser.add_argument("-dec_layers", default=6, type=int)
+    # parser.add_argument("-dec_layers", default=4, type=int)
+
     parser.add_argument("-dec_hidden_size", default=768, type=int)
+
     parser.add_argument("-dec_heads", default=8, type=int)
+    # parser.add_argument("-dec_heads", default=4, type=int)
     parser.add_argument("-dec_ff_size", default=2048, type=int)
+    # parser.add_argument("-dec_ff_size", default=1024, type=int)
+
     parser.add_argument("-enc_hidden_size", default=512, type=int)
     parser.add_argument("-enc_ff_size", default=512, type=int)
     parser.add_argument("-enc_dropout", default=0.2, type=float)
@@ -72,9 +80,9 @@ if __name__ == '__main__':
     parser.add_argument("-generator_shard_size", default=32, type=int)
     parser.add_argument("-alpha",  default=0.6, type=float)
     parser.add_argument("-beam_size", default=5, type=int)
-    parser.add_argument("-min_length", default=15, type=int)
-    parser.add_argument("-max_length", default=150, type=int)
-    parser.add_argument("-max_tgt_len", default=140, type=int)
+    parser.add_argument("-min_length", default=50, type=int)
+    parser.add_argument("-max_length", default=600, type=int)
+    parser.add_argument("-max_tgt_len", default=900, type=int)
 
 
 
@@ -90,6 +98,7 @@ if __name__ == '__main__':
     parser.add_argument("-max_grad_norm", default=0, type=float)
 
     parser.add_argument("-save_checkpoint_steps", default=5, type=int)
+    parser.add_argument("-val_interval", default=1000, type=int)
     parser.add_argument("-accum_count", default=1, type=int)
     parser.add_argument("-report_every", default=1, type=int)
     parser.add_argument("-train_steps", default=1000, type=int)
@@ -110,6 +119,10 @@ if __name__ == '__main__':
     parser.add_argument("-block_trigram", type=str2bool, nargs='?', const=True, default=True)
 
     parser.add_argument("-section_prediction", action='store_true')
+
+
+    ############
+
 
     args = parser.parse_args()
     args.gpu_ranks = [int(i) for i in range(len(args.visible_gpus.split(',')))]

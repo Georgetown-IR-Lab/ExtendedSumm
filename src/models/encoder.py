@@ -94,7 +94,8 @@ class ExtTransformerEncoder(nn.Module):
         # import pdb;pdb.set_trace()
 
         for i in range(self.num_inter_layers):
-            x = self.transformer_inter[i](i, x, x, 1 - mask)  # all_sents * max_tokens * dim
+            # x = self.transformer_inter[i](i, x, x, 1 - mask)  # all_sents * max_tokens * dim
+            x = self.transformer_inter[i](i, x, x, ~mask)  # all_sents * max_tokens * dim
         x = self.layer_norm(x)
 
         return x

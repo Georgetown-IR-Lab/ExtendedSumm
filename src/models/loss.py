@@ -8,7 +8,7 @@ from __future__ import division
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from apex import amp
 from models.reporter import Statistics
 
 
@@ -95,8 +95,7 @@ class LossComputeBase(nn.Module):
         return batch_stats
 
     def sharded_compute_loss(self, batch, output,
-                              shard_size,
-                             normalization):
+                              shard_size, normalization, optim):
         """Compute the forward loss and backpropagate.  Computation is done
         with shards and optionally truncation for memory efficiency.
 
@@ -128,7 +127,9 @@ class LossComputeBase(nn.Module):
         shard_state = self._make_shard_state(batch, output)
         for shard in shards(shard_state, shard_size):
             loss, stats = self._compute_loss(batch, **shard)
-            loss.div(float(normalization)).backward()
+            with amp.scale_loss(loss, optim.optimizer) as scaled_loss:
+                scaled_loss.div(float(normalization)).backward()
+
             batch_stats.update(stats)
 
         return batch_stats

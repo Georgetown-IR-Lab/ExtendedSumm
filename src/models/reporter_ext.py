@@ -157,9 +157,10 @@ class ReportMgr(ReportMgrBase):
         #                            step)
 
         if valid_stats is not None:
-            self.log('Validation xent: %g (mse_sent: %g, xent_sect: %g), (ACC: %4.4f) at step %d' % (valid_stats.total_loss(),
-                                                                                       valid_stats.mse_sent(),
-                                                                                       valid_stats.xent_sect(), valid_stats._get_acc_sect(), step))
+            self.log('Validation xent: %g (mse_sent: %g, xent_sect: %g), (ACC: %4.4f) at step %d' % (
+            valid_stats.total_loss(),
+            valid_stats.mse_sent(),
+            valid_stats.xent_sect(), valid_stats._get_acc_sect(), step))
             # self.log('Validation: sent_xent: %g, sect_xent: %g, xent: %g at step %d' %
             #          (valid_stats.xent_sent(),valid_stats.xent_sect(),valid_stats.xent(), step))
 
@@ -360,10 +361,10 @@ class Statistics(object):
             # foveral, f11, f12, f13, f14, f15 = self.self_get_f1_sect()
             logger.info(
                 (
-                        "Step %s; mse_sent: %4.2f (%4.2f/%d) + xent_sect: %4.2f = mlt: %4.2f (RMSE-sent: %4.4f, ACC: %4.4f) "
-                        # "F1-sect: %4.2f ([0] %4.2f, "
-                        # "[1] %4.2f, [2] %4.2f, [3] %4.2f, [4] %4.2f)); " +
-                        "lr: %7.7f; %3.0f docs/s; %6.0f sec")
+                    "Step %s; mse_sent: %4.2f (%4.2f/%d) + xent_sect: %4.2f = mlt: %4.2f (RMSE-sent: %4.4f, ACC: %4.4f) "
+                    # "F1-sect: %4.2f ([0] %4.2f, "
+                    # "[1] %4.2f, [2] %4.2f, [3] %4.2f, [4] %4.2f)); " +
+                    "lr: %7.7f; %3.0f docs/s; %6.0f sec")
                 % (step_fmt,
                    self.mse_sent(),
                    self.loss_sent,
@@ -403,6 +404,14 @@ class Statistics(object):
             writer.add_scalar(prefix + "/Rouge-1", self.r1, step)
             writer.add_scalar(prefix + "/Rouge-2", self.r2, step)
             writer.add_scalar(prefix + "/Rouge-l", self.rl, step)
+            # writer.add_scalars(prefix + "/Section-wise-acc", {
+            #     "Total": self.acc_infos[0],
+            #     "Introduction": self.acc_infos[1],
+            #     "Related": self.acc_infos[2],
+            #     "Method": self.acc_infos[3],
+            #     "Results": self.acc_infos[4],
+            #     "Conclusion": self.acc_infos[5]
+            # }, step)
 
     def write_stat_header(self, is_joint):
         if not is_joint:
@@ -431,3 +440,11 @@ class Statistics(object):
             return 0
 
         return self.accuracy / self.n_acc
+
+    def set_sectionwise_acc(self, acc_infos, total1, count):
+        self.acc_infos = [0, 0, 0, 0, 0, 0]
+        for i, (key, val) in enumerate(acc_infos.items()):
+            if i == 0:
+                self.acc_infos[i] = float("%4.2f " % (val / total1))
+            else:
+                self.acc_infos[i] = float("%4.2f " % (val / count[i-1]))

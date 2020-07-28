@@ -4,11 +4,14 @@ from __future__ import print_function
 import codecs
 import os
 import math
+import pickle
 
 import torch
 
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
+import utils.rouge
 from others.utils import rouge_results_to_str, test_rouge, tile
 from translate.beam import GNMTGlobalScorer
 
@@ -122,36 +125,53 @@ class Translator(object):
 
     def translate(self,
                   data_iter, step,
-                  attn_debug=False):
+                  attn_debug=False, return_entities=False):
 
         self.model.eval()
-        gold_path = self.args.result_path + '.%d.gold' % step
-        can_path = self.args.result_path + '.%d.candidate' % step
-        self.gold_out_file = codecs.open(gold_path, 'w', 'utf-8')
-        self.can_out_file = codecs.open(can_path, 'w', 'utf-8')
+        # gold_path = self.args.result_path + '.%d.gold' % step
+        # can_path = self.args.result_path + '.%d.candidate' % step
+        # self.gold_out_file = codecs.open(gold_path, 'w', 'utf-8')
+        # self.can_out_file = codecs.open(can_path, 'w', 'utf-8')
+        #
+        # # raw_gold_path = self.args.result_path + '.%d.raw_gold' % step
+        # # raw_can_path = self.args.result_path + '.%d.raw_candidate' % step
+        # self.gold_out_file = codecs.open(gold_path, 'w', 'utf-8')
+        # self.can_out_file = codecs.open(can_path, 'w', 'utf-8')
+        #
+        # raw_src_path = self.args.result_path + '.%d.raw_src' % step
+        # self.src_out_file = codecs.open(raw_src_path, 'w', 'utf-8')
 
-        # raw_gold_path = self.args.result_path + '.%d.raw_gold' % step
-        # raw_can_path = self.args.result_path + '.%d.raw_candidate' % step
-        self.gold_out_file = codecs.open(gold_path, 'w', 'utf-8')
-        self.can_out_file = codecs.open(can_path, 'w', 'utf-8')
+        paper_summaries = {}
+        paper_golds = {}
 
-        raw_src_path = self.args.result_path + '.%d.raw_src' % step
-        self.src_out_file = codecs.open(raw_src_path, 'w', 'utf-8')
 
+        test_iter = data_iter()
+
+        counter = 0
+        for _ in test_iter:
+            counter += 1
+        test_iter = data_iter()
+        # import pdb;
+        # pdb.set_trace()
         # pred_results, gold_results = [], []
         ct = 0
+
         with torch.no_grad():
-            for batch in data_iter:
-                if(self.args.recall_eval):
-                    gold_tgt_len = batch.tgt.size(1)
-                    self.min_length = gold_tgt_len + 20
-                    self.max_length = gold_tgt_len + 60
+            for batch in tqdm(test_iter, total=counter):
+                # if(self.args.recall_eval):
+                #     gold_tgt_len = batch.tgt.size(1)
+                #     self.min_length = gold_tgt_len + 20
+                #     self.max_length = gold_tgt_len + 60
+                paper_id = batch.paper_id
                 batch_data = self.translate_batch(batch)
                 translations = self.from_batch(batch_data)
 
-                for trans in translations:
+                # for trans in translations:
+                for p_id, trans in zip(paper_id, translations):
+
                     pred, gold, src = trans
                     pred_str = pred.replace('[unused0]', '').replace('[unused3]', '').replace('[PAD]', '').replace('[unused1]', '').replace(r' +', ' ').replace(' [unused2] ', '<q>').replace('[unused2]', '').strip()
+                    # print(pred_str)
                     gold_str = gold.strip()
                     if(self.args.recall_eval):
                         _pred_str = ''
@@ -168,34 +188,43 @@ class Translator(object):
                                 _pred_str = can_pred_str
 
 
-
+                    if p_id not in paper_summaries.keys():
+                        paper_summaries[p_id] = pred_str
+                        paper_golds[p_id] = gold_str
+                    else:
+                        paper_summaries[p_id] = paper_summaries[p_id] + ' ' + pred_str
+                        # paper_golds[p_id] = paper_golds[p_id] + ' ' + gold_str
                         # pred_str = ' '.join(pred_str.split()[:len(gold_str.split())])
                     # self.raw_can_out_file.write(' '.join(pred).strip() + '\n')
                     # self.raw_gold_out_file.write(' '.join(gold).strip() + '\n')
-                    self.can_out_file.write(pred_str + '\n')
-                    self.gold_out_file.write(gold_str + '\n')
-                    self.src_out_file.write(src.strip() + '\n')
+                    # self.can_out_file.write(pred_str + '\n')
+                    # self.gold_out_file.write(gold_str + '\n')
+                    # self.src_out_file.write(src.strip() + '\n')
                     ct += 1
-                self.can_out_file.flush()
-                self.gold_out_file.flush()
-                self.src_out_file.flush()
+                # with open('train_abs_summaries', mode='wb') as f:
+                #     pickle.dump(paper_summaries,f)
+                # self.can_out_file.flush()
+                # self.gold_out_file.flush()
+                # self.src_out_file.flush()
 
-        self.can_out_file.close()
-        self.gold_out_file.close()
-        self.src_out_file.close()
+        # self.can_out_file.close()
+        # self.gold_out_file.close()
+        # self.src_out_file.close()
+        if return_entities:
+            return paper_summaries, paper_golds
+        # self._report_rouge(paper_summaries.values(), paper_golds.values())
 
-        if (step != -1):
-            rouges = self._report_rouge(gold_path, can_path)
-            self.logger.info('Rouges at step %d \n%s' % (step, rouge_results_to_str(rouges)))
-            if self.tensorboard_writer is not None:
-                self.tensorboard_writer.add_scalar('test/rouge1-F', rouges['rouge_1_f_score'], step)
-                self.tensorboard_writer.add_scalar('test/rouge2-F', rouges['rouge_2_f_score'], step)
-                self.tensorboard_writer.add_scalar('test/rougeL-F', rouges['rouge_l_f_score'], step)
+        # if (step != -1):
+            # self.logger.info('Rouges at step %d \n%s' % (step, rouge_results_to_str(rouges)))
+            # if self.tensorboard_writer is not None:
+            #     self.tensorboard_writer.add_scalar('test/rouge1-F', rouges['rouge_1_f_score'], step)
+            #     self.tensorboard_writer.add_scalar('test/rouge2-F', rouges['rouge_2_f_score'], step)
+            #     self.tensorboard_writer.add_scalar('test/rougeL-F', rouges['rouge_l_f_score'], step)
 
-    def _report_rouge(self, gold_path, can_path):
-        self.logger.info("Calculating Rouge")
-        results_dict = test_rouge(self.args.temp_dir, can_path, gold_path)
-        return results_dict
+    # def _report_rouge(self, gold_path, can_path):
+    #     self.logger.info("Calculating Rouge")
+    #     results_dict = test_rouge(self.args.temp_dir, can_path, gold_path)
+    #     return results_dict
 
     def translate_batch(self, batch, fast=False):
         """
@@ -267,7 +296,7 @@ class Translator(object):
         results["scores"] = [[] for _ in range(batch_size)]  # noqa: F812
         results["gold_score"] = [0] * batch_size
         results["batch"] = batch
-
+        # for step in tqdm(range(max_length), total=max_length):
         for step in range(max_length):
             decoder_input = alive_seq[:, -1].view(1, -1)
 
@@ -374,6 +403,16 @@ class Translator(object):
                 lambda state, dim: state.index_select(dim, select_indices))
 
         return results
+
+    def _report_rouge(self, predictions, references):
+        r1, r2, rl, r1_cf, r2_cf, rl_cf = utils.rouge.get_rouge(predictions, references, use_cf=True)
+        # print("{} set results:\n".format(args.filename))
+        print("Metric\tScore\t95% CI")
+        print("ROUGE-1\t{:.2f}\t({:.2f},{:.2f})".format(r1, r1_cf[0] - r1, r1_cf[1] - r1))
+        print("ROUGE-2\t{:.2f}\t({:.2f},{:.2f})".format(r2, r2_cf[0] - r2, r2_cf[1] - r2))
+        print("ROUGE-L\t{:.2f}\t({:.2f},{:.2f})".format(rl, rl_cf[0] - rl, rl_cf[1] - rl))
+        return r1, r2, rl
+
 
 
 class Translation(object):

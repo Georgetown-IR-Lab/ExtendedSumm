@@ -1,14 +1,18 @@
 import os
+import pickle
 
 import numpy as np
 import torch
 import torch.nn as nn
 from tensorboardX import SummaryWriter
+from torch.autograd import Variable
+from tqdm import tqdm
 
 import distributed
 import utils.rouge
 from models.reporter_ext import ReportMgr, Statistics
 from others.logging import logger
+from utils.rouge_score import evaluate_rouge
 
 
 def _tally_parameters(model):
@@ -104,12 +108,14 @@ class Trainer(object):
         self.valid_trajectories = []
         self.valid_rgls = []
         # self.loss = torch.nn.BCELoss(reduction='none')
-        self.loss = torch.nn.MSELoss(reduction='none')
+        self.loss = torch.nn.MSELoss(reduction='sum')
+        self.rmse_loss = torch.nn.MSELoss(reduction='none')
         self.bin_loss = torch.nn.BCELoss(reduction='none')
         self.loss_sect = torch.nn.CrossEntropyLoss(reduction='none')
         self.min_val_loss = 100000
         self.min_rl = -100000
         self.softmax = nn.Softmax(dim=2)
+        self.softmax_sent = nn.Softmax(dim=1)
         assert grad_accum_count > 0
         # Set model in training mode.
         if (model):
@@ -149,7 +155,6 @@ class Trainer(object):
         self._start_report_manager(start_time=total_stats.start_time)
 
         while step <= train_steps:
-
             reduce_counter = 0
             for i, batch in enumerate(train_iter):
                 if self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
@@ -162,16 +167,6 @@ class Trainer(object):
                             normalization = sum(distributed
                                                 .all_gather_list
                                                 (normalization))
-
-                        # if step == 1:  # Validation
-                        #     logger.info('----------------------------------------')
-                        #     logger.info('Start evaluating on evaluation set... ')
-                        #     val_stat, best_model_save = self.validate_rouge(valid_iter_fct, step,
-                        #                                                     valid_gl_stats=valid_global_stats)
-                        #     if best_model_save:
-                        #         self._save(step, best=True)
-                        #         logger.info(f'Best model saved sucessfully at step %d' % step)
-                        #     logger.info('----------------------------------------')
 
                         self._gradient_accumulation(
                             true_batchs, normalization, total_stats,
@@ -187,24 +182,19 @@ class Trainer(object):
                         true_batchs = []
                         accum = 0
                         normalization = 0
-                        sent_num_normalization = 0
                         if (step % self.save_checkpoint_steps == 0 and self.gpu_rank == 0):
                             self._save(step)
 
-                        if step % 5000 == 0:  # Validation
+                        if step % self.args.val_interval == 0:  # Validation
                             logger.info('----------------------------------------')
                             logger.info('Start evaluating on evaluation set... ')
                             val_stat, best_model_save = self.validate_rouge(valid_iter_fct, step,
                                                                             valid_gl_stats=valid_global_stats)
                             if best_model_save:
-                                self._save(step, best=True)
+                                self._save(step)
                                 logger.info(f'Best model saved sucessfully at step %d' % step)
                             logger.info('----------------------------------------')
                             self.model.train()
-
-                        # if step % 6000 == 0:
-                        #     self.alpha_decacy(step)
-                        #     logger.info((f'Alpha degraded to %4.2f at step %d') % (self.alpha, step))
 
                         step += 1
                         if step > train_steps:
@@ -212,6 +202,82 @@ class Trainer(object):
             train_iter = train_iter_fct()
 
         return total_stats
+
+    def validate_cls(self, valid_iter_fct, step=0, valid_gl_stats=None):
+        # Set model in validating mode.
+        def _get_ngrams(n, text):
+            ngram_set = set()
+            text_length = len(text)
+            max_index_ngram_start = text_length - n
+            for i in range(max_index_ngram_start + 1):
+                ngram_set.add(tuple(text[i:i + n]))
+            return ngram_set
+
+        # Set model in validating mode.
+        self.model.eval()
+        stats = Statistics()
+        best_model_saved = False
+        valid_iter = valid_iter_fct()
+
+        with torch.no_grad():
+            for batch in valid_iter:
+                src = batch.src
+                labels = batch.src_sent_labels
+                sent_labels = batch.sent_labels
+                segs = batch.segs
+                clss = batch.clss
+                mask = batch.mask_src
+                mask_cls = batch.mask_cls
+                sent_sect_labels = batch.sent_sect_labels
+
+                if self.is_joint:
+                    sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+
+                    # loss_sent = self.loss(sent_scores, labels.float())
+                    # loss_sent = self.bin_loss(sent_scores, sent_labels.float())
+                    loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
+                    loss_sect = (loss_sect * mask.float()).sum()
+                    # loss_sent = (loss_sent * mask.float()).sum()
+
+                    # loss_sent = self.alpha * loss_sent
+                    # loss_sect = (1 - self.alpha) * loss_sect
+
+                    # loss_sent = loss_sent
+                    # loss_sect = loss_sect
+
+                    # loss = loss_sent + loss_sect
+                    loss = loss_sect
+                    acc, _ = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                                task='sent_sect')
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
+                                             loss_sect=float(loss_sect.cpu().data.numpy().sum()),
+                                             loss_sent=float(loss_sect.cpu().data.numpy().sum()),
+                                             n_docs=len(labels),
+                                             n_acc=batch.batch_size,
+                                             RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
+                                             accuracy=acc)
+
+                else:
+                    sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                    loss = self.bin_loss(sent_scores, sent_labels.float())
+
+                    loss = (loss * mask.float()).sum()
+
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
+                                             RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
+                                             n_acc=batch.batch_size,
+                                             n_docs=len(labels))
+
+                stats.update(batch_stats)
+
+        self._report_step(0, step, valid_stats=stats)
+        self.valid_rgls.append(stats._get_acc_sect())
+        if len(self.valid_rgls) > 0:
+            if self.min_rl < self.valid_rgls[-1]:
+                self.min_rl = self.valid_rgls[-1]
+                best_model_saved = True
+
+        return stats, best_model_saved
 
     def validate_rouge(self, valid_iter_fct, step=0, valid_gl_stats=None):
         """ Validate model.
@@ -244,6 +310,8 @@ class Trainer(object):
         save_pred = open(can_path, 'w')
         save_gold = open(gold_path, 'w')
         sent_scores_whole = {}
+        sent_sects_whole = {}
+        sent_sects_whole_true = {}
         paper_srcs = {}
         paper_tgts = {}
 
@@ -254,7 +322,7 @@ class Trainer(object):
         valid_iter = valid_iter_fct()
 
         with torch.no_grad():
-            for batch in valid_iter:
+            for batch in tqdm(valid_iter, total=1413):
                 src = batch.src
                 labels = batch.src_sent_labels
                 sent_labels = batch.sent_labels
@@ -270,34 +338,34 @@ class Trainer(object):
                 if self.is_joint:
                     sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
 
-                    loss_sent = self.loss(sent_scores, labels.float())
+                    # loss_sent = self.loss(sent_scores, labels.float())
+                    loss_sent = self.bin_loss(sent_scores, sent_labels.float())
                     loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
-
-                    loss_sent = (loss_sent * mask.float()).sum()
                     loss_sect = (loss_sect * mask.float()).sum()
+                    loss_sent = (loss_sent * mask.float()).sum()
 
                     loss_sent = self.alpha * loss_sent
                     loss_sect = (1 - self.alpha) * loss_sect
 
-                    loss_sent = loss_sent
-                    loss_sect = loss_sect
+                    # loss_sent = loss_sent
+                    # loss_sect = loss_sect
 
                     loss = loss_sent + loss_sect
-                    # loss = loss_sect
-
+                    acc, _ = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                                task='sent_sect')
                     batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
                                              loss_sect=float(loss_sect.cpu().data.numpy().sum()),
                                              loss_sent=float(loss_sent.cpu().data.numpy().sum()),
                                              n_docs=len(labels),
                                              n_acc=batch.batch_size,
                                              RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
-                                             accuracy=self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
-                                                                         task='sent_sect'))
+                                             accuracy=acc)
 
                 else:
                     sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                    loss = self.bin_loss(sent_scores, sent_labels.float())
 
-                    loss = self.loss(sent_scores, labels.float())
+                    # loss = self.loss(sent_scores, labels.float())
 
                     loss = (loss * mask.float()).sum()
 
@@ -313,39 +381,91 @@ class Trainer(object):
 
                 if paper_id not in sent_scores_whole.keys():
                     sent_scores_whole[paper_id] = sent_scores
+                    if self.is_joint:
+                        sent_sects_whole[paper_id] = torch.max(self.softmax(sent_sect_scores), 2)[1].cpu()
+                        sent_sects_whole_true[paper_id] = sent_sect_labels.cpu()
                     paper_srcs[paper_id] = segment_src
                     paper_tgts[paper_id] = paper_tgt
                 else:
                     sent_scores_whole[paper_id] = np.concatenate((sent_scores_whole[paper_id], sent_scores), 1)
+                    if self.is_joint:
+                        sent_sects_whole[paper_id] = np.concatenate(
+                            (sent_sects_whole[paper_id], torch.max(self.softmax(sent_sect_scores), 2)[1].cpu()), 1)
+                        sent_sects_whole_true[paper_id] = np.concatenate(
+                            (sent_sects_whole_true[paper_id], sent_sect_labels.cpu()), 1)
+
                     paper_srcs[paper_id] = np.concatenate((paper_srcs[paper_id], segment_src), 1)
 
-            for paper_id, sent_scores in sent_scores_whole.items():
-                selected_ids = np.argsort(-sent_scores, 1)[0]
-                _pred = []
+        # if self.is_joint:
+        #     acc_infos = {'whole': 0, '0': 0, '1': 0, '2': 0, '3': 0, '4': 0}
+        #     total_count = [0, 0, 0, 0, 0]
+        #     for paper_id, sent_scores in sent_scores_whole.items():
+        #         acc_info, count = self._get_sect_accurracy(sent_sects_whole[paper_id],
+        #                                                    sent_sects_whole_true[paper_id])
+        #         for i, c in enumerate(count):
+        #             total_count[i] += c
+        #
+        #         acc_infos['whole'] += acc_info[0]
+        #         acc_infos['0'] += acc_info[0]
+        #         acc_infos['1'] += acc_info[1]
+        #         acc_infos['2'] += acc_info[2]
+        #         # acc_infos['3'] += acc_info[3]
+        #         # acc_infos['4'] += acc_info[4]
 
-                for j in selected_ids:
-                    candidate = paper_srcs[paper_id][0][j].strip()
-                    if (self.args.block_trigram):
-                        if (not _block_tri(candidate, _pred)):
-                            _pred.append(candidate)
-                    else:
+        for paper_id, sent_scores in sent_scores_whole.items():
+            selected_ids = np.argsort(-sent_scores, 1)[0]
+
+            selected_ids = [s for s in selected_ids if len(paper_srcs[paper_id][0][s].split()) > 5]
+
+            selected_ids = selected_ids[:60]
+            selected_ids = sorted(selected_ids, reverse=False)
+
+            _pred = []
+
+            for j in selected_ids:
+                candidate = paper_srcs[paper_id][0][j].strip()
+                # if len(candidate.split(' ')) < 5:
+                #     continue
+                if (self.args.block_trigram):
+                    if (not _block_tri(candidate, _pred)):
                         _pred.append(candidate)
+                else:
+                    _pred.append(candidate)
 
-                    if (len(_pred) == 3):
-                        break
+                if (len(_pred) == 30):
+                    break
 
-                _pred = '<q>'.join(_pred)
-                if (self.args.recall_eval):
-                    _pred = ' '.join(_pred.split()[:len(paper_tgts[paper_id].split())])
+            # _pred = '<q>'.join(_pred)
+            _pred = '<q>'.join(_pred)
+            if (self.args.recall_eval):
+                _pred = ' '.join(_pred.split()[:len(paper_tgts[paper_id].split())])
 
-                preds[paper_id] = _pred
-                golds[paper_id] = paper_tgts[paper_id]
+            preds[paper_id] = _pred
+            golds[paper_id] = paper_tgts[paper_id]
 
+        # import pdb;pdb.set_trace()
         for id, pred in preds.items():
-            save_pred.write(pred.strip() + '\n')
-            save_gold.write(golds[id].strip() + '\n')
+            save_pred.write(pred.strip().replace('<q>', ' ') + '\n')
+            save_gold.write(golds[id].replace('<q>', ' ').strip() + '\n')
 
+        # if self.is_joint:
+        #     total_count = [t if t>0 else 1 for t in total_count]
+        #
+        #
+        #     logger.info("\n Section accuracies: \n")
+        #     section_info = ''
+        #     for i, (key, val) in enumerate(acc_infos.items()):
+        #         if i == 0:
+        #             logger.info("Total acc: %s : %4.2f " % (key, val / len(sent_sects_whole_true)))
+        #         else:
+        #             section_info += "%s %s : %4.2f | " % ("Section-wise:" if i == 1 else "", key, val / total_count[i - 1])
+        #     logger.info(section_info)
+        #     if self.is_joint:
+        #         stats.set_sectionwise_acc(acc_infos, len(sent_sects_whole_true), total_count)
+        # ps = list(preds.values())
+        # gs = list(golds.values())
         r1, r2, rl = self._report_rouge(preds.values(), golds.values())
+        # r1, r2, rl = self._report_rouge(ps[:10], gs[:10])
         stats.set_rl(r1, r2, rl)
         valid_gl_stats._write_file(step, stats, r1, r2, rl)
         self.valid_rgls.append(rl)
@@ -358,7 +478,183 @@ class Trainer(object):
 
         return stats, best_model_saved
 
-    def test(self, test_iter, step, cal_lead=False, cal_oracle=False):
+    def test_cls_csabs(self, test_iter, step, cal_lead=False, cal_oracle=False):
+        def _get_ngrams(n, text):
+            ngram_set = set()
+            text_length = len(text)
+            max_index_ngram_start = text_length - n
+            for i in range(max_index_ngram_start + 1):
+                ngram_set.add(tuple(text[i:i + n]))
+            return ngram_set
+
+        # Set model in validating mode.
+        self.model.eval()
+        stats = Statistics()
+        self.er = {}
+        # self.files = {'0': open('method')}
+
+        with torch.no_grad():
+            for batch in test_iter:
+                src = batch.src
+                labels = batch.src_sent_labels
+                sent_labels = batch.sent_labels
+                segs = batch.segs
+                clss = batch.clss
+                mask = batch.mask_src
+                mask_cls = batch.mask_cls
+                sent_sect_labels = batch.sent_sect_labels
+                segment_src = batch.src_str
+
+                if self.is_joint:
+                    sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+
+                    # loss_sent = self.loss(sent_scores, labels.float())
+                    loss_sent = self.bin_loss(sent_scores, sent_labels.float())
+                    loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
+                    loss_sect = (loss_sect * mask.float()).sum()
+                    loss_sent = (loss_sent * mask.float()).sum()
+
+                    loss_sent = self.alpha * loss_sent
+                    loss_sect = (1 - self.alpha) * loss_sect
+
+                    loss = loss_sect
+                    acc, pred = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                                   task='sent_sect')
+
+                    for i, (p, l) in enumerate(zip(pred[0], sent_sect_labels[0])):
+                        key = str(p.data.item()) + '->' + str(l.data.item())
+                        if key in self.er:
+                            self.er[key] += 1
+                            with open('er/' + key + '.txt', mode='a')as f:
+                                f.write(segment_src[0][i])
+                                f.write('\n')
+                        else:
+                            self.er[key] = 1
+                            with open('er/' + key + '.txt', mode='a')as f:
+                                f.write(segment_src[0][i])
+                                f.write('\n')
+
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
+                                             loss_sect=float(loss_sect.cpu().data.numpy().sum()),
+                                             loss_sent=float(loss_sent.cpu().data.numpy().sum()),
+                                             n_docs=len(labels),
+                                             n_acc=batch.batch_size,
+                                             RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
+                                             accuracy=acc)
+
+                else:
+                    sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                    loss = self.bin_loss(sent_scores, sent_labels.float())
+
+                    loss = (loss * mask.float()).sum()
+
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
+                                             RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
+                                             n_acc=batch.batch_size,
+                                             n_docs=len(labels))
+
+                stats.update(batch_stats)
+
+        import operator
+        sorted_x = sorted(self.er.items(), key=operator.itemgetter(1))
+        print(sorted_x)
+
+    def test_cls(self, test_iter, step, cal_lead=False, cal_oracle=False):
+        """ Validate model.
+                    valid_iter: validate data iterator
+                Returns:
+                    :obj:`nmt.Statistics`: validation loss statistics
+                """
+
+        # Set model in validating mode.
+        def _get_ngrams(n, text):
+            ngram_set = set()
+            text_length = len(text)
+            max_index_ngram_start = text_length - n
+            for i in range(max_index_ngram_start + 1):
+                ngram_set.add(tuple(text[i:i + n]))
+            return ngram_set
+
+        def _block_tri(c, p):
+            tri_c = _get_ngrams(3, c.split())
+            for s in p:
+                tri_s = _get_ngrams(3, s.split())
+                if len(tri_c.intersection(tri_s)) > 0:
+                    return True
+            return False
+
+        stats = Statistics()
+        preds = {}
+        golds = {}
+        can_path = '%s_step%d.candidate' % (self.args.result_path, step)
+        gold_path = '%s_step%d.gold' % (self.args.result_path, step)
+        save_pred = open(can_path, 'w')
+        save_gold = open(gold_path, 'w')
+        sent_scores_whole = {}
+        paper_srcs = {}
+        paper_tgts = {}
+
+        with torch.no_grad():
+            for batch in test_iter:
+                src = batch.src
+                labels = batch.src_sent_labels
+                segs = batch.segs
+                clss = batch.clss
+                sent_bin_labels = batch.sent_labels
+                mask = batch.mask_src
+                mask_cls = batch.mask_cls
+                paper_id = batch.paper_id[0]
+                segment_src = batch.src_str
+                paper_tgt = batch.tgt_str[0]
+                sent_sect_labels = batch.sent_sect_labels
+
+                if self.is_joint:
+                    sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+
+                    loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
+                    loss_sect = (loss_sect * mask.float()).sum()
+
+                    loss = loss_sect
+                    acc, pred = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                                   task='sent_sect')
+                    # print(acc)
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), loss_sect=loss_sect,
+                                             loss_sent=loss_sect,
+                                             n_docs=len(labels),
+                                             accuracy=acc,
+                                             n_acc=batch.batch_size
+                                             )
+
+                else:
+                    sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                    # loss = self.loss(sent_scores, labels.float())
+                    loss = self.bin_loss(sent_scores, sent_bin_labels.float())
+                    loss = (loss * mask.float()).sum()
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy()),
+                                             n_docs=len(labels))
+
+                stats.update(batch_stats)
+
+                sent_scores = sent_scores + mask.float()
+                # sent_scores = sent_scores.cpu().data.numpy()
+
+                if paper_id not in sent_scores_whole.keys():
+                    sent_scores_whole[paper_id] = pred
+                    paper_srcs[paper_id] = segment_src
+                    paper_tgts[paper_id] = paper_tgt
+                else:
+                    sent_scores_whole[paper_id] = np.concatenate((sent_scores_whole[paper_id], pred), 1)
+                    paper_srcs[paper_id] = np.concatenate((paper_srcs[paper_id], segment_src), 1)
+
+            for paper_id, sent_scores in sent_scores_whole.items():
+                _pred = sent_scores
+                preds[paper_id] = _pred
+                golds[paper_id] = paper_tgts[paper_id]
+
+        self._report_step(0, step, valid_stats=stats)
+        return stats
+
+    def test(self, test_iter_fct, step, cal_lead=False, cal_oracle=False):
         """ Validate model.
             valid_iter: validate data iterator
         Returns:
@@ -389,18 +685,29 @@ class Trainer(object):
         golds = {}
         can_path = '%s_step%d.candidate' % (self.args.result_path, step)
         gold_path = '%s_step%d.gold' % (self.args.result_path, step)
+
+        if len(self.args.bart_dir_out.strip()) > 0:
+            can_path = '%s/test.candidate' % (self.args.bart_dir_out)
+            gold_path ='%s/test.gold' % (self.args.bart_dir_out)
         save_pred = open(can_path, 'w')
         save_gold = open(gold_path, 'w')
         sent_scores_whole = {}
         paper_srcs = {}
         paper_tgts = {}
+        test_iter = test_iter_fct()
+        counter = 0
+        for b in test_iter:
+            counter += 1
 
+        test_iter = test_iter_fct()
         with torch.no_grad():
-            for batch in test_iter:
+            # for batch in tqdm(test_iter_fct, total=counter):
+            for batch in tqdm(test_iter, total=counter):
                 src = batch.src
                 labels = batch.src_sent_labels
                 segs = batch.segs
                 clss = batch.clss
+                sent_bin_labels = batch.sent_labels
                 mask = batch.mask_src
                 mask_cls = batch.mask_cls
                 paper_id = batch.paper_id[0]
@@ -410,31 +717,36 @@ class Trainer(object):
 
                 if self.is_joint:
                     sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-                    loss_sent = self.loss(sent_scores, labels.float())
+                    # loss_sent = self.loss(sent_scores, labels.float())
+                    # loss_sent = self.loss(sent_scores, labels.float())
+                    loss_sent = self.bin_loss(sent_scores, sent_bin_labels.float())
+                    loss_sent = (loss_sent * mask.float()).sum()
+
                     loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
                     loss_sect = (loss_sect * mask.float()).sum()
                     loss_sent = (loss_sent * mask.float()).sum()
                     loss_sent = self.alpha * loss_sent
                     loss_sect = (1 - self.alpha) * loss_sect
                     loss = loss_sent + loss_sect
-                    acc = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
-                                                                         task='sent_sect')
+                    acc, pred = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                                   task='sent_sect')
+                    # print(acc)
                     batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), loss_sect=loss_sect,
                                              loss_sent=loss_sent,
                                              n_docs=len(labels),
-                                             accuracy= acc,
+                                             accuracy=acc,
                                              n_acc=batch.batch_size
                                              )
 
                 else:
                     sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-                    loss = self.loss(sent_scores, labels.float())
+                    # loss = self.loss(sent_scores, labels.float())
+                    loss = self.bin_loss(sent_scores, sent_bin_labels.float())
                     loss = (loss * mask.float()).sum()
                     batch_stats = Statistics(loss=float(loss.cpu().data.numpy()),
                                              n_docs=len(labels))
 
                 stats.update(batch_stats)
-
                 sent_scores = sent_scores + mask.float()
                 sent_scores = sent_scores.cpu().data.numpy()
 
@@ -443,24 +755,37 @@ class Trainer(object):
                     paper_srcs[paper_id] = segment_src
                     paper_tgts[paper_id] = paper_tgt
                 else:
-                    sent_scores_whole[paper_id] = np.concatenate((sent_scores_whole[paper_id], sent_scores), 1)
+                    try:
+                        sent_scores_whole[paper_id] = np.concatenate((sent_scores_whole[paper_id], sent_scores), 1)
+                    except:
+                        import pdb;
+                        pdb.set_trace()
                     paper_srcs[paper_id] = np.concatenate((paper_srcs[paper_id], segment_src), 1)
 
             for paper_id, sent_scores in sent_scores_whole.items():
                 selected_ids = np.argsort(-sent_scores, 1)[0]
+
+                selected_ids = [s for s in selected_ids if len(paper_srcs[paper_id][0][s].split()) > 5]
+
+                selected_ids = selected_ids[:60]
+                selected_ids = sorted(selected_ids, reverse=False)
+
                 _pred = []
 
                 for j in selected_ids:
                     candidate = paper_srcs[paper_id][0][j].strip()
+                    # if len(candidate.split(' ')) < 5:
+                    #     continue
                     if (self.args.block_trigram):
                         if (not _block_tri(candidate, _pred)):
                             _pred.append(candidate)
                     else:
                         _pred.append(candidate)
 
-                    if (len(_pred) == 3):
+                    if (len(_pred) == 30):
                         break
 
+                # _pred = '<q>'.join(_pred)
                 _pred = '<q>'.join(_pred)
                 if (self.args.recall_eval):
                     _pred = ' '.join(_pred.split()[:len(paper_tgts[paper_id].split())])
@@ -469,8 +794,8 @@ class Trainer(object):
                 golds[paper_id] = paper_tgts[paper_id]
 
             for id, pred in preds.items():
-                save_pred.write(pred.strip() + '\n')
-                save_gold.write(golds[id].strip() + '\n')
+                save_pred.write(pred.strip().replace('<q>', ' ') + '\n')
+                save_gold.write(golds[id].replace('<q>', ' ').strip() + '\n')
 
         print(f'Gold: {gold_path}')
         print(f'Prediction: {can_path}')
@@ -485,6 +810,162 @@ class Trainer(object):
         #     rouges = test_rouge(self.args.temp_dir, can_path, gold_path)
         #     logger.info('Rouges at step %d \n%s' % (step, rouge_results_to_str(rouges)))
         self._report_rouge(preds.values(), golds.values())
+        self._report_step(0, step, valid_stats=stats)
+
+        return stats
+
+    def test_ids(self, test_iter_fct, step, cal_lead=False, cal_oracle=False):
+        """ Validate model.
+            valid_iter: validate data iterator
+        Returns:
+            :obj:`nmt.Statistics`: validation loss statistics
+        """
+
+        # Set model in validating mode.
+        def _get_ngrams(n, text):
+            ngram_set = set()
+            text_length = len(text)
+            max_index_ngram_start = text_length - n
+            for i in range(max_index_ngram_start + 1):
+                ngram_set.add(tuple(text[i:i + n]))
+            return ngram_set
+
+        def _block_tri(c, p):
+            tri_c = _get_ngrams(3, c.split())
+            for s in p:
+                tri_s = _get_ngrams(3, s.split())
+                if len(tri_c.intersection(tri_s)) > 0:
+                    return True
+            return False
+
+        if (not cal_lead and not cal_oracle):
+            self.model.eval()
+        stats = Statistics()
+        preds = {}
+        golds = {}
+        selected_sent_idS = {}
+        can_path = '%s_step%d.candidate' % (self.args.result_path, step)
+        gold_path = '%s_step%d.gold' % (self.args.result_path, step)
+        save_pred = open(can_path, 'w')
+        save_gold = open(gold_path, 'w')
+        sent_scores_whole = {}
+        paper_srcs = {}
+        paper_tgts = {}
+        test_iter = test_iter_fct()
+        counter = 0
+        for b in test_iter:
+            counter += 1
+
+        test_iter = test_iter_fct()
+
+        with torch.no_grad():
+            for batch in tqdm(test_iter, total=counter):
+                src = batch.src
+                labels = batch.src_sent_labels
+                segs = batch.segs
+                clss = batch.clss
+                sent_bin_labels = batch.sent_labels
+                mask = batch.mask_src
+                mask_cls = batch.mask_cls
+                paper_id = batch.paper_id[0]
+                segment_src = batch.src_str
+                paper_tgt = batch.tgt_str[0]
+                sent_sect_labels = batch.sent_sect_labels
+                import pdb;pdb.set_trace()
+
+                if self.is_joint:
+                    sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                    # loss_sent = self.loss(sent_scores, labels.float())
+                    # loss_sent = self.loss(sent_scores, labels.float())
+                    loss_sent = self.bin_loss(sent_scores, sent_bin_labels.float())
+                    loss_sent = (loss_sent * mask.float()).sum()
+
+                    loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
+                    loss_sect = (loss_sect * mask.float()).sum()
+                    loss_sent = (loss_sent * mask.float()).sum()
+                    loss_sent = self.alpha * loss_sent
+                    loss_sect = (1 - self.alpha) * loss_sect
+                    loss = loss_sent + loss_sect
+                    acc, pred = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                                   task='sent_sect')
+                    # print(acc)
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy()), loss_sect=loss_sect,
+                                             loss_sent=loss_sent,
+                                             n_docs=len(labels),
+                                             accuracy=acc,
+                                             n_acc=batch.batch_size
+                                             )
+
+                else:
+                    sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
+                    # loss = self.loss(sent_scores, labels.float())
+                    loss = self.bin_loss(sent_scores, sent_bin_labels.float())
+                    loss = (loss * mask.float()).sum()
+                    batch_stats = Statistics(loss=float(loss.cpu().data.numpy()),
+                                             n_docs=len(labels))
+
+                stats.update(batch_stats)
+                sent_scores = sent_scores + mask.float()
+                sent_scores = sent_scores.cpu().data.numpy()
+
+                if paper_id not in sent_scores_whole.keys():
+                    sent_scores_whole[paper_id] = sent_scores
+                    paper_srcs[paper_id] = segment_src
+                    paper_tgts[paper_id] = paper_tgt
+                else:
+                    try:
+                        sent_scores_whole[paper_id] = np.concatenate((sent_scores_whole[paper_id], sent_scores), 1)
+                    except:
+                        import pdb;
+                        pdb.set_trace()
+                    paper_srcs[paper_id] = np.concatenate((paper_srcs[paper_id], segment_src), 1)
+
+            for paper_id, sent_scores in sent_scores_whole.items():
+                selected_ids = np.argsort(-sent_scores, 1)[0]
+                _pred = []
+                selected_ids = selected_ids[:75]
+                selected_ids = sorted(selected_ids, reverse=False)
+                # for j in selected_ids:
+                #     candidate = paper_srcs[paper_id][0][j].strip()
+                #     if (self.args.block_trigram):
+                #         if (not _block_tri(candidate, _pred)):
+                #             _pred.append(candidate)
+                #     else:
+                #         _pred.append(candidate)
+
+                    # if (len(_pred) == 50):
+                    #     break
+
+                # _pred = '<q>'.join(_pred)
+                #
+                # if (self.args.recall_eval):
+                #     _pred = ' '.join(_pred.split()[:len(paper_tgts[paper_id].split())])
+                #
+                # preds[paper_id] = _pred
+                # golds[paper_id] = paper_tgts[paper_id]
+                selected_sent_idS[paper_id] = selected_ids
+
+
+            # for id, pred in preds.items():
+            #     save_pred.write(pred.strip() + '\n')
+            #     save_gold.write(golds[id].strip() + '\n')
+
+            with open('selected_ids_test.pkl', 'wb') as output:
+                pickle.dump(selected_sent_idS, output)
+
+        # print(f'Gold: {gold_path}')
+        # print(f'Prediction: {can_path}')
+
+        # for paper_id, sent_scores in sent_scores_whole.items():
+
+        # for i in range(len(gold)):
+        #     save_gold.write(gold[i].strip() + '\n')
+        # for i in range(len(pred)):
+        #     save_pred.write(pred[i].strip() + '\n')
+        # if (step != -1 and self.args.report_rouge):
+        #     rouges = test_rouge(self.args.temp_dir, can_path, gold_path)
+        #     logger.info('Rouges at step %d \n%s' % (step, rouge_results_to_str(rouges)))
+        # self._report_rouge(preds.values(), golds.values())
         self._report_step(0, step, valid_stats=stats)
 
         return stats
@@ -508,12 +989,13 @@ class Trainer(object):
             mask_cls = batch.mask_cls
             if self.is_joint:
                 sent_scores, sent_sect_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-
-                loss_sent = self.loss(sent_scores, labels.float())
+                # loss_sent = self.loss(sent_scores, labels.float())
+                #
                 # loss_sent = self.bin_loss(sent_scores, sent_bin_labels.float())
-                loss_sent = (loss_sent * mask.float()).sum()
-                loss_sent = loss_sent / loss_sent.numel()
+                # loss_sent = (loss_sent * mask.float()).sum()
+                # loss_sent = loss_sent / loss_sent.numel()
 
+                # loss_sent = loss_sent / sent_scores.shape[0]
                 loss_sect = self.loss_sect(sent_sect_scores.permute(0, 2, 1), sent_sect_labels)
                 loss_sect = (loss_sect * mask.float()).sum()
                 loss_sect = loss_sect / loss_sect.numel()
@@ -523,16 +1005,18 @@ class Trainer(object):
                 # for param in self.model.section_predictor.parameters():
                 #     reg += 0.5 * (param ** 2).sum()
 
-                loss_sent = self.alpha * loss_sent
-                loss_sect = (1 - self.alpha) * (loss_sect)
-                loss = loss_sent + loss_sect
+                # loss_sent = self.alpha * loss_sent
+                # loss_sect = (1 - self.alpha) * (loss_sect)
 
+                # loss = loss_sent + loss_sect
+                loss = loss_sect
 
-                acc = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
-                                         task='sent_sect')
+                acc, _ = self._get_mertrics(sent_sect_scores, sent_sect_labels, mask=mask,
+                                            task='sent_sect')
+
                 batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
                                          loss_sect=float(loss_sect.cpu().data.numpy().sum()),
-                                         loss_sent=float(loss_sent.cpu().data.numpy().sum()), n_docs=normalization,
+                                         loss_sent=float(loss_sect.cpu().data.numpy().sum()), n_docs=normalization,
                                          n_acc=batch.batch_size,
                                          RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
                                          accuracy=acc)
@@ -540,12 +1024,10 @@ class Trainer(object):
 
             else:  # simple
                 sent_scores, mask = self.model(src, segs, clss, mask, mask_cls)
-                loss = self.loss(sent_scores, labels.float())
-
-                loss = torch.sum((loss * mask.float()), dim=1)  # loss for each batch
-                loss = (loss / torch.sum(mask, dim=1).float())
-                loss = loss.float().sum()
-
+                # loss = self.loss(sent_scores, labels.float())
+                loss = self.bin_loss(sent_scores, sent_bin_labels.float())
+                loss = (loss * mask.float()).sum()
+                loss = loss / loss.numel()
                 batch_stats = Statistics(loss=float(loss.cpu().data.numpy().sum()),
                                          RMSE=self._get_mertrics(sent_scores, labels, mask=mask, task='sent'),
                                          n_acc=batch.batch_size,
@@ -655,12 +1137,13 @@ class Trainer(object):
             self.model_saver.maybe_save(step)
 
     def _report_rouge(self, predictions, references):
-        r1, r2, rl, r1_cf, r2_cf, rl_cf = utils.rouge.get_rouge(predictions, references, use_cf=True)
+        # r1, r2, rl, r1_cf, r2_cf, rl_cf = utils.rouge.get_rouge(predictions, references, use_cf=False)
+        r1, r2, rl = evaluate_rouge(predictions, references)
         # print("{} set results:\n".format(args.filename))
         print("Metric\tScore\t95% CI")
-        print("ROUGE-1\t{:.2f}\t({:.2f},{:.2f})".format(r1, r1_cf[0] - r1, r1_cf[1] - r1))
-        print("ROUGE-2\t{:.2f}\t({:.2f},{:.2f})".format(r2, r2_cf[0] - r2, r2_cf[1] - r2))
-        print("ROUGE-L\t{:.2f}\t({:.2f},{:.2f})".format(rl, rl_cf[0] - rl, rl_cf[1] - rl))
+        print("ROUGE-1\t{:.2f}\t({:.2f},{:.2f})".format(r1, 0,0))
+        print("ROUGE-2\t{:.2f}\t({:.2f},{:.2f})".format(r2, 0,0))
+        print("ROUGE-L\t{:.2f}\t({:.2f},{:.2f})".format(rl, 0,0))
         return r1, r2, rl
 
     def _get_mertrics(self, sent_scores, labels, mask=None, task='sent_sect'):
@@ -669,30 +1152,87 @@ class Trainer(object):
         sent_scores = sent_scores.to('cuda')
         mask = mask.to('cuda')
 
-        def _compute_f1(labels, pred):
-            tp = ((labels * pred).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
-            fp = (((1 - labels) * (pred)).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
-            fn = (((labels) * (1 - pred)).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
-            tn = (((1 - labels) * (1 - pred)).long() * mask.long()).sum(dim=1).to(dtype=torch.float)
-            # epsilon = 1e-7
-            # precision = tp / (tp + fp + epsilon)
-            # recall = tp / (tp + fn + epsilon)
-            # f1 = 2 * (precision * recall) / (precision + recall + epsilon)
-            return tp, fp, fn, tn
-
         if task == 'sent_sect':
             sent_scores = self.softmax(sent_scores)
             pred = torch.max(sent_scores, 2)[1]
             acc = (((pred == labels) * mask.cuda()).sum(dim=1)).to(dtype=torch.float) / \
                   mask.sum(dim=1).to(dtype=torch.float)
-            return acc.sum().item()
+            return acc.sum().item(), pred
 
         else:
-            mseLoss = self.loss(sent_scores.float(), labels.float())
+            mseLoss = self.rmse_loss(sent_scores.float(), labels.float())
             mseLoss = (mseLoss.float() * mask.float()).sum(dim=1)
 
+            # sent_scores = self.softmax_sent(sent_scores)
+            # import pdb;pdb.set_trace()
+            # pred = torch.max(sent_scores, 2)[1]
+            # acc = (((pred == labels) * mask.cuda()).sum(dim=1)).to(dtype=torch.float) / mask.sum(dim=1).to(dtype=torch.float)
             return mseLoss.sum().item()
 
-    def alpha_decacy(self, step):
-        alpha0 = .95
-        self.alpha = alpha0 - (alpha0 * (.75 ** (152000 / step)))
+    def _get_sect_accurracy(self, pred, true):
+
+        acc_out = [0, 0, 0, 0, 0, 0]
+
+        for p, t in zip(pred[0], true[0]):
+
+            if p == t:
+                acc_out[0] += 1
+            if p == 0 and t == 0:
+                acc_out[1] += 1
+            if p == 1 and t == 1:
+                acc_out[2] += 1
+            if p == 2 and t == 2:
+                acc_out[3] += 1
+            if p == 3 and t == 3:
+                acc_out[4] += 1
+            if p == 4 and t == 4:
+                acc_out[5] += 1
+
+        acc_outy = []
+        count = []
+        try:
+            acc_outy.append(acc_out[0] / len(true[0]))
+        except:
+            acc_outy.append(0)
+
+        try:
+            acc_outy.append(acc_out[1] / np.count_nonzero(true[0] == 0))
+            count.append(1)
+
+        except:
+            acc_outy.append(0)
+            count.append(0)
+
+        try:
+            acc_outy.append(acc_out[2] / np.count_nonzero(true[0] == 1))
+            count.append(1)
+
+        except:
+            acc_outy.append(0)
+            count.append(0)
+
+        try:
+            acc_outy.append(acc_out[3] / np.count_nonzero(true[0] == 2))
+            count.append(1)
+
+        except:
+            acc_outy.append(0)
+            count.append(0)
+
+        # try:
+        #     acc_outy.append(acc_out[4] / np.count_nonzero(true[0] == 3))
+        #     count.append(1)
+        #
+        # except:
+        #     acc_outy.append(0)
+        #     count.append(0)
+        #
+        # try:
+        #     acc_outy.append(acc_out[5] / np.count_nonzero(true[0] == 4))
+        #     count.append(1)
+        #
+        # except:
+        #     acc_outy.append(0)
+        #     count.append(0)
+
+        return acc_outy, count

@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
 
-server() {
-    servername="$1"
-    if servername==barolo
-    then
-        DATA_PATH=/disk1/sajad/datasets/cspubsum/bert-files/
-        MAX_POS=1024
-        MODEL_PATH=/disk1/sajad/sci-trained-models/presum/cspubsum-bertsum-multi-shared/
-    else
-        DATA_PATH=/disk1/sajad/datasets/sci/cspubsum/bert-files
-        MAX_POS=1024
-        MODEL_PATH=/disk1/sajad/sci-trained-models/presum/cspubsum-bertsum-multi-shared4-seperate/
-    fi
-    echo "$DATA_PATH $MODEL_PATH $MAX_POS"
-}
+#DATA_PATH=/disk1/sajad/datasets/sci/csabs/bert-files/5l/
+#DATA_PATH=/disk1/sajad/datasets/sci/arxiv//bert-files/5l-new/
+#DATA_PATH=/disk1/sajad/datasets/sci/csp/bert-files/5l-rg-labels-whole-3/
+#DATA_PATH=/disk1/sajad/datasets/sci/lsum/bert-files/6labels/
+#DATA_PATH=/home/sajad/datasets/longsumm/bs-bert-data-ext-phase2/
+#DATA_PATH=/disk1/sajad/datasets/sci/arxiv/bert-files/5l-bin/
 
-#DATA_PATH=/disk1/sajad/datasets/sci/arxiv//bert-files/5l-rg/
-DATA_PATH=/disk1/sajad/datasets/sci/csp/bert-files/5l-rg-labels/
+#LONGSUM
+#DATA_PATH=/home/sajad/datasets/longsumm/bs-data-1700/
+#DATA_PATH=/home/sajad/datasets/longsumm/bert_files/
+DATA_PATH=/home/sajad/datasets/longsumm/new-abs-set/bert-files-section/
 
-MAX_POS=1024
-MODEL_PATH=/disk1/sajad/sci-trained-models/presum/csp-bertsum-rg-last/
+MAX_POS=1700
+#MODEL_PATH=/disk1/sajad/sci-trained-models/presum/lsum-first-phase/
+#MODEL_PATH=/disk1/sajad/sci-trained-models/presum/lsum-arxiv-new/
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/lsum-arxiv-section/
+CHECKPOINT=/disk1/sajad/sci-trained-models/presum/arxiv-first-phase/model_step_30000.pt
 
 
 rm -r $MODEL_PATH
@@ -34,14 +31,16 @@ python train.py -task ext \
                 -lr 2e-3 \
                 -visible_gpus 0,1 \
                 -report_every 50 \
-                -save_checkpoint_steps 10000 \
-                -batch_size 3000 \
+                -val_interval 1500 \
+                -save_checkpoint_steps 5000 \
+                -batch_size 2000 \
                 -test_batch_size 1 \
-                -train_steps 180000 \
-                -log_file ../logs/bertmulti_cspubsum \
+                -train_steps 150000 \
+                -log_file arxiv \
                 -use_interval true \
                 -warmup_steps 10000 \
                 -max_pos $MAX_POS \
-                -alpha_mtl 0.1 \
-                -accum_count 2
-#                -section_prediction \
+                -accum_count 2 \
+                -train_from $CHECKPOINT
+#                -alpha_mtl 0.60 \
+#                -section_prediction

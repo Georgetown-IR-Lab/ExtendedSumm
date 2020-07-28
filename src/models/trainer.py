@@ -1,13 +1,19 @@
 import os
+import random
 
 import numpy as np
 import torch
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
 import distributed
+from models.predictor import build_predictor
 from models.reporter import ReportMgr, Statistics
 from others.logging import logger
+# from others.tokenization import BertTokenizer
+from transformers import BertTokenizer
 from others.utils import test_rouge, rouge_results_to_str
+import utils.rouge
 
 
 def _tally_parameters(model):
@@ -15,7 +21,7 @@ def _tally_parameters(model):
     return n_params
 
 
-def build_trainer(args, device_id, model, optims,loss):
+def build_trainer(args, device_id, model, optims, loss):
     """
     Simplify `Trainer` creation based on user `opt`s*
     Args:
@@ -88,6 +94,7 @@ class Trainer(object):
                   grad_accum_count=1, n_gpu=1, gpu_rank=1,
                   report_manager=None):
         # Basic attributes.
+        self.valid_rgls = []
         self.args = args
         self.save_checkpoint_steps = args.save_checkpoint_steps
         self.model = model
@@ -96,8 +103,13 @@ class Trainer(object):
         self.n_gpu = n_gpu
         self.gpu_rank = gpu_rank
         self.report_manager = report_manager
-
+        self.valid_accuracies = []
+        self.max_rl = 0
         self.loss = loss
+        self.last_best_step = []
+        # self.tokenizer = BertTokenizer.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased', do_lower_case=True)
+        self.tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True)
+        # self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
 
         assert grad_accum_count > 0
         # Set model in training mode.
@@ -137,11 +149,9 @@ class Trainer(object):
         self._start_report_manager(start_time=total_stats.start_time)
 
         while step <= train_steps:
-
             reduce_counter = 0
             for i, batch in enumerate(train_iter):
                 if self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
-
                     true_batchs.append(batch)
                     num_tokens = batch.tgt[:, 1:].ne(self.loss.padding_idx).sum()
                     normalization += num_tokens.item()
@@ -152,22 +162,27 @@ class Trainer(object):
                             normalization = sum(distributed
                                                 .all_gather_list
                                                 (normalization))
-
                         self._gradient_accumulation(
                             true_batchs, normalization, total_stats,
                             report_stats)
-
                         report_stats = self._maybe_report_training(
                             step, train_steps,
                             self.optims[0].learning_rate,
                             report_stats)
-
                         true_batchs = []
                         accum = 0
                         normalization = 0
                         if (step % self.save_checkpoint_steps == 0 and self.gpu_rank == 0):
                             self._save(step)
 
+                        if (step % self.args.val_interval == 0):
+                            _, is_best = self.validate(valid_iter_fct, step)
+                            if is_best:
+                                self._save(step)
+                                logger.info('Best model saved at step %d' % step)
+                                if len(self.last_best_step) > 1:
+                                    self._delete()
+                            self.model.train()
                         step += 1
                         if step > train_steps:
                             break
@@ -175,7 +190,16 @@ class Trainer(object):
 
         return total_stats
 
-    def validate(self, valid_iter, step=0):
+    def _report_rouge(self, predictions, references):
+        r1, r2, rl, r1_cf, r2_cf, rl_cf = utils.rouge.get_rouge(predictions, references, use_cf=True)
+        # print("{} set results:\n".format(args.filename))
+        logger.info("Metric\tScore\t95% CI")
+        logger.info("ROUGE-1\t{:.2f}\t({:.2f},{:.2f})".format(r1, r1_cf[0] - r1, r1_cf[1] - r1))
+        logger.info("ROUGE-2\t{:.2f}\t({:.2f},{:.2f})".format(r2, r2_cf[0] - r2, r2_cf[1] - r2))
+        logger.info("ROUGE-L\t{:.2f}\t({:.2f},{:.2f})".format(rl, rl_cf[0] - rl, rl_cf[1] - rl))
+        return r1, r2, rl
+
+    def validate(self, valid_iter_fct, step=0):
         """ Validate model.
             valid_iter: validate data iterator
         Returns:
@@ -184,9 +208,14 @@ class Trainer(object):
         # Set model in validating mode.
         self.model.eval()
         stats = Statistics()
-
+        valid_iter = valid_iter_fct()
+        cn = 0
+        for _ in valid_iter:
+            cn+=1
+        best_model_saved = False
+        valid_iter = valid_iter_fct()
         with torch.no_grad():
-            for batch in valid_iter:
+            for batch in tqdm(valid_iter, total=cn):
                 src = batch.src
                 tgt = batch.tgt
                 segs = batch.segs
@@ -199,9 +228,78 @@ class Trainer(object):
 
                 batch_stats = self.loss.monolithic_compute_loss(batch, outputs)
                 stats.update(batch_stats)
-            self._report_step(0, step, valid_stats=stats)
-            return stats
 
+            self.valid_rgls.append(stats.accuracy())
+            if len(self.valid_rgls) > 0:
+                if self.max_rl < self.valid_rgls[-1]:
+                    self.max_rl = self.valid_rgls[-1]
+                    best_model_saved = True
+
+            self._report_step(0, step, valid_stats=stats)
+            return stats, best_model_saved
+
+    def validate_rouge(self, valid_iter, step=0):
+        """ Validate model.
+            valid_iter: validate data iterator
+        Returns:
+            :obj:`nmt.Statistics`: validation loss statistics
+        """
+        # Set model in validating mode.
+        self.model.eval()
+        stats = Statistics()
+
+        preds, golds = self.val_abs(self.args, valid_iter, step)
+        best_model_saved = False
+        preds_sorted = [s[1] for s in sorted(preds.items())]
+        golds_sorted = [g[1] for g in sorted(golds.items())]
+        logger.info('Some samples...')
+        logger.info('[' + preds_sorted[random.randint(0, len(preds_sorted)-1)] + ']')
+        logger.info('[' + preds_sorted[random.randint(0, len(preds_sorted)-1)] + ']')
+        logger.info('[' + preds_sorted[random.randint(0, len(preds_sorted)-1)] + ']')
+        r1, r2, rl = self._report_rouge(preds_sorted, golds_sorted)
+
+        stats.set_rl(r1, r2, rl)
+        self.valid_rgls.append(rl)
+        # self._report_step(0, step, valid_stats=stats)
+
+        if len(self.valid_rgls) > 0:
+            if self.max_rl < self.valid_rgls[-1]:
+                self.max_rl = self.valid_rgls[-1]
+                best_model_saved = True
+
+        # with torch.no_grad():
+        #     for batch in valid_iter:
+        #         src = batch.src
+        #         tgt = batch.tgt
+        #         segs = batch.segs
+        #         clss = batch.clss
+        #         mask_src = batch.mask_src
+        #         mask_tgt = batch.mask_tgt
+        #         mask_cls = batch.mask_cls
+        #
+        #         outputs, _ = self.model(src, tgt, segs, clss, mask_src, mask_tgt, mask_cls)
+        #
+        #         batch_stats = self.loss.monolithic_compute_loss(batch, outputs)
+        #         stats.update(batch_stats)
+        #     self._report_step(0, step, valid_stats=stats)
+        #
+        #     # if len(self.valid_accuracies) > 0:
+        #     if self.best_acc < stats.accuracy():
+        #         is_best = True
+        #         self.best_acc = stats.accuracy()
+        #         self.last_best_step.append(step)
+            # self.valid_accuracies.append(stats.accuracy())
+            return stats, best_model_saved
+
+    def val_abs(self, args, iter_fct, step):
+        self.model.eval()
+
+        # tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
+        # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
+        symbols = {'BOS': self.tokenizer.vocab['[unused0]'], 'EOS': self.tokenizer.vocab['[unused1]'],
+                   'PAD': self.tokenizer.vocab['[PAD]'], 'EOQ': self.tokenizer.vocab['[unused2]']}
+        predictor = build_predictor(args, self.tokenizer, symbols, self.model, logger)
+        return predictor.translate(iter_fct, step, return_entities = True)
 
     def _gradient_accumulation(self, true_batchs, normalization, total_stats,
                                report_stats):
@@ -211,7 +309,6 @@ class Trainer(object):
         for batch in true_batchs:
             if self.grad_accum_count == 1:
                 self.model.zero_grad()
-
             src = batch.src
             tgt = batch.tgt
             segs = batch.segs
@@ -219,9 +316,8 @@ class Trainer(object):
             mask_src = batch.mask_src
             mask_tgt = batch.mask_tgt
             mask_cls = batch.mask_cls
-
-            outputs, scores = self.model(src, tgt,segs, clss, mask_src, mask_tgt, mask_cls)
-            batch_stats = self.loss.sharded_compute_loss(batch, outputs, self.args.generator_shard_size, normalization)
+            outputs, scores = self.model(src, tgt, segs, clss, mask_src, mask_tgt, mask_cls)
+            batch_stats = self.loss.sharded_compute_loss(batch, outputs, self.args.generator_shard_size, normalization, optim=self.optims[0])
 
             batch_stats.n_docs = int(src.size(0))
 
@@ -238,8 +334,8 @@ class Trainer(object):
                     distributed.all_reduce_and_rescale_tensors(
                         grads, float(1))
 
-                for o in self.optims:
-                    o.step()
+                for optim in self.optims:
+                    optim.step()
 
         # in case of multi step gradient accumulation,
         # update only after accum batches
@@ -250,8 +346,8 @@ class Trainer(object):
                          and p.grad is not None]
                 distributed.all_reduce_and_rescale_tensors(
                     grads, float(1))
-            for o in self.optims:
-                o.step()
+            for optim in self.optims:
+                optim.step()
 
 
     def test(self, test_iter, step, cal_lead=False, cal_oracle=False):
@@ -377,7 +473,7 @@ class Trainer(object):
         if self.report_manager is not None:
             return self.report_manager.report_training(
                 step, num_steps, learning_rate, report_stats,
-                multigpu=self.n_gpu > 1)
+                multigpu=self.n_gpu > 1, is_train=True)
 
     def _report_step(self, learning_rate, step, train_stats=None,
                      valid_stats=None):
@@ -396,3 +492,8 @@ class Trainer(object):
         """
         if self.model_saver is not None:
             self.model_saver.maybe_save(step)
+
+    def _delete(self):
+        checkpoint_path = os.path.join(self.args.model_path, 'model_step_%d.pt' % self.last_best_step[-2])
+        os.remove(checkpoint_path)
+

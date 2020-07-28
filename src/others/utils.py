@@ -14,6 +14,10 @@ def clean(x):
         r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''",
         lambda m: REMAP.get(m.group()), x)
 
+def clean_upper(x):
+    return re.sub(
+        r"-LRB-|-RRB-|-LCB-|-RCB-|-LSB-|-RSB-|``|''",
+        lambda m: REMAP.get(m.group()), x)
 
 def process(params):
     temp_dir, data = params

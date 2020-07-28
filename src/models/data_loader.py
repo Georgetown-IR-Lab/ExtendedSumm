@@ -21,12 +21,16 @@ class Batch(object):
         def labelize(lists):
             for list in lists:
                 for j, elem in enumerate(list):
-                    if elem == 1:
+                    if elem == 1 or elem == 0:
                         list[j] = 0
-                    if elem == 3 or elem == 2:
+                    if elem==2:
                         list[j] = 1
-                    if elem == 4:
+                    if elem == 3 or elem == 4 or elem == 5:
                         list[j] = 2
+                    # if elem == 5:
+                    #     list[j] = 3
+                    # if elem==5:
+                    #     import pdb;pdb.set_trace()
 
         if data is not None:
             self.batch_size = len(data)
@@ -37,10 +41,10 @@ class Batch(object):
             pre_src_sent_labels = [x[4] for x in data]
             pre_sent_labels = [x[5] for x in data]
             sent_sect_labels = [x[6] for x in data]
-            # labelize(sent_sect_labels)
+            labelize(sent_sect_labels)
             if is_test:
                 sent_sect_labels = [x[8] for x in data]
-                # labelize(sent_sect_labels)
+                labelize(sent_sect_labels)
                 paper_id = [x[9] for x in data]
 
             src = torch.tensor(self._pad(pre_src, 0))
@@ -51,7 +55,18 @@ class Batch(object):
             mask_tgt = 1 - (tgt == 0)
 
             clss = torch.tensor(self._pad(pre_clss, -1))
-            src_sent_labels = torch.tensor(self._pad(pre_src_sent_labels, 0))
+            try:
+                src_sent_labels = torch.tensor(self._pad(pre_src_sent_labels, 0))
+                # import pdb;pdb.set_trace()
+            except:
+                import pdb;pdb.set_trace()
+                print(paper_id)
+
+                # for p in range(len(pre_clss[0])):
+                #     rg.append(1)
+                # src_sent_labels = torch.tensor(self._pad(rg, 0))
+                # import pdb;pdb.set_trace()
+
             sent_labels = torch.tensor(self._pad(pre_sent_labels, 0))
             sent_sect_labels = torch.tensor(self._pad(sent_sect_labels, 0))
             mask_cls = 1 - (clss == -1)
@@ -208,9 +223,9 @@ class DataIterator(object):
 
         src = ex['src']
         tgt = ex['tgt'][:self.args.max_tgt_len][:-1] + [2]
+        # import pdb;pdb.set_trace()
         src_sent_labels = ex['src_sent_labels']
         sent_labels = ex['sent_labels']
-
         segs = ex['segs']
         if (not self.args.use_interval):
             segs = [0] * len(segs)
@@ -234,6 +249,7 @@ class DataIterator(object):
         src_txt = src_txt[:max_sent_id]
         sent_sect_labels = sent_sect_labels[:max_sent_id]
 
+        # import pdb;pdb.set_trace()
         if (is_test):
             return src, tgt, segs, clss, src_sent_labels, sent_labels, src_txt, tgt_txt, sent_sect_labels, paper_id
         else:
@@ -324,8 +340,6 @@ class TextDataloader(object):
 
     def preprocess(self, ex, is_test):
         src = ex['src']
-        import pdb;
-        pdb.set_trace()
         tgt = ex['tgt'][:self.args.max_tgt_len][:-1] + [2]
         src_sent_labels = ex['src_sent_labels']
         sent_labels = ex['sent_labels']

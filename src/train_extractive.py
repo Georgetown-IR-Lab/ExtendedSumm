@@ -187,14 +187,20 @@ def test_ext(args, device_id, pt, step, is_joint=False):
             setattr(args, k, opt[k])
     print(args)
 
+    def test_iter_fct():
+        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=False), args.test_batch_size, device,
+                                      shuffle=False, is_test=True)
+
     model = ExtSummarizer(args, device, checkpoint, is_joint=is_joint)
     model.eval()
 
-    test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
-                                       args.test_batch_size, device,
-                                       shuffle=False, is_test=True)
+    # test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
+    #                                    args.test_batch_size, device,
+    #                                    shuffle=False, is_test=True)
     trainer = build_trainer(args, device_id, model, None)
-    trainer.test(test_iter, step)
+    # trainer.test(test_iter, step)
+    # trainer.test(test_iter_fct, step)
+    trainer.test(test_iter_fct, step)
 
 def train_ext(args, device_id, is_joint=False):
     if (args.world_size > 1):
@@ -237,7 +243,7 @@ def train_single_ext(args, device_id, is_joint=False):
         return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
                                       shuffle=True, is_test=False)
     def val_iter_fct():
-        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=True), args.test_batch_size, device,
+        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=False), 1, device,
                                       shuffle=True, is_test=True)
 
     model = ExtSummarizer(args, device, checkpoint, is_joint)

@@ -1,53 +1,44 @@
-import csv
-import os
+import json
+import re
+import sys
 
-from pythonrouge.pythonrouge import Pythonrouge
-from progress.bar import ChargingBar
+from rouge_score import rouge_scorer
+import numpy as np
 
+def impose_max_length(summary_text, max_tokens=600):
+    # same tokenization as in rouge_score
+    # https://github.com/google-research/google-research/blob/26a130831ee903cb97b7d04e71f227bbe24960b2/rouge/tokenize.py
+    text = summary_text.lower()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    tokens = re.split(r"\s+", text)
+    tokens = [x for x in tokens if re.match(r"^[a-z0-9]+$", x)]
+    tokens = tokens[0:min(max_tokens, len(tokens))]
+    return " ".join(tokens)
 
-def csv_writer(filename, ref, hyp, p1, p2, p3):
-    with open(filename, mode='a') as rouge_scores:
-        employee_writer = csv.writer(rouge_scores, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        employee_writer.writerow([ref, hyp, p1, p2, p3])
+def evaluate_rouge(hypotheses, references):
+    metrics = ['rouge1', 'rouge2', 'rougeL']
+    scorer = rouge_scorer.RougeScorer(metrics, use_stemmer=True)
+    results = {"rouge1_f": [], "rouge1_r": [], "rouge2_f": [], "rouge2_r": [], "rougeL_f": [], "rougeL_r": []}
+    results_avg = {}
 
+    if len(hypotheses) < len(references):
+        print("Warning number of papers in submission file is smaller than ground truth file", file=sys.stderr)
+    # import pdb;pdb.set_trace()
+    hypotheses = list(hypotheses)
+    references = list(references)
+    for j, hyp in enumerate(hypotheses):
+        submission_summary = hyp.replace('<q>', ' ')
 
-def get_rouge(filename, hypothesis, references):
+        submission_summary = impose_max_length(submission_summary)
+        ground_truth_summary = impose_max_length(references[j].replace('<q>',' '))
 
-    assert len(hypothesis) == len(references)
-    assert len(hypothesis) > 0
-    r1_total = 0
-    r2_total = 0
-    rl_total = 0
-    if os.path.exists(filename):
-        os.remove(filename)
+        scores = scorer.score(ground_truth_summary.strip(), submission_summary.strip())
 
-    csv_writer(filename, 'Gold', "Prediction", 'RG-1', 'RG-2', 'RG-l')
-    bar = ChargingBar('Processing', max = len(references))
-    print('\n')
-    for hyp, ref in zip(hypothesis, references):
-        summary = [[hyp]]
-        reference = [[[ref]]]
-        # initialize setting of ROUGE to eval ROUGE-1, 2, SU4
-        # if you evaluate ROUGE by sentence list as above, set summary_file_exist=False
-        # if recall_only=True, you can get recall scores of ROUGE
-        rouge = Pythonrouge(summary_file_exist=False, summary=summary, reference=reference, \
-            n_gram=2, ROUGE_SU4=False, ROUGE_L=True, recall_only=False, stemming=False, stopwords=False,\
-            word_level=True, length_limit=False, use_cf=True, cf=95, scoring_formula='average', \
-            resampling=True, samples=1000, favor=True, p=0.5)
-        score = rouge.calc_score()
-        # print(score)
-        r1 = score['ROUGE-1-F'] * 100
-        r2 = score['ROUGE-2-F'] * 100
-        rl = score['ROUGE-L-F'] * 100
-        r1_total += r1
-        r2_total += r2
-        rl_total += rl
-        csv_writer(filename, ref, hyp, r1, r2, rl)
-        bar.next()
-    print('\nROUGE-1: {}'.format(r1_total / len(references)))
-    print('\nROUGE-2: {}'.format(r2_total / len(references)))
-    print('\nROUGE-l: {}'.format(rl_total / len(references)))
-    csv_writer(filename, '', '', r1_total / len(references), r1_total / len(references), rl_total / len(references))
+        for metric in metrics:
+            results[metric + "_f"].append(scores[metric].fmeasure)
+            results[metric + "_r"].append(scores[metric].recall)
 
-    bar.finish()
+        for rouge_metric, rouge_scores in results.items():
+            results_avg[rouge_metric] = np.average(rouge_scores)
 
+    return results_avg['rouge1_f']*100, results_avg['rouge2_f']*100, results_avg['rougeL_f']*100

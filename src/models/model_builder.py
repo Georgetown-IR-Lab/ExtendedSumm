@@ -2,10 +2,12 @@ import copy
 
 import torch
 import torch.nn as nn
-from pytorch_transformers import BertModel, BertConfig
+from transformers import BertModel, BertConfig
+# from pytorch_transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
+from torch.utils import checkpoint
 
-from models.decoder import TransformerDecoder
+from models.decoder import TransformerDecoder, TransformerDecoderState
 from models.encoder import Classifier, ExtTransformerEncoder
 from models.optimizers import Optimizer
 
@@ -120,18 +122,34 @@ class Bert(nn.Module):
             self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
         else:
             # self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
-            self.model = BertModel.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased',
-                                                   cache_dir=temp_dir)
+            self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
 
         self.finetune = finetune
 
+    def custom_sent_decider(self, module):
+        def custom_forward(*inputs):
+            output,_ = module(inputs[0],
+                            attention_mask=inputs[1],
+                            token_type_ids=inputs[2],
+                            )
+            return output
+
+        return custom_forward
+
     def forward(self, x, segs, mask):
         if (self.finetune):
-            top_vec, _ = self.model(x, segs, attention_mask=mask)
+
+            top_vec, _ = self.model(x, attention_mask=mask, token_type_ids=segs)
+
+            # top_vec = checkpoint.checkpoint(
+            #     self.custom_sent_decider(self.model),
+            #     x, mask, segs,
+            # )
+
         else:
             self.eval()
             with torch.no_grad():
-                top_vec, _ = self.model(x, segs, attention_mask=mask)
+                top_vec, _ = self.model(x, attention_mask=mask, token_type_ids=segs)
         return top_vec
 
 
@@ -165,12 +183,43 @@ class ExtSummarizer(nn.Module):
 
         self.to(device)
 
+
+
+    def custom_bert_encoder(self, module):
+        def custom_forward(*inputs):
+            output = module(inputs[0],
+                            inputs[1],
+                            inputs[2],
+                            inputs[3],
+                            inputs[4],
+                            )
+            return output
+
+        return custom_forward
+
     def forward(self, src, segs, clss, mask_src, mask_cls):
         encoded = self.sentence_encoder(src, segs, clss, mask_src, mask_cls)
         sent_score = self.sentence_predictor(encoded, mask_cls)
+
+        # encoded = checkpoint.checkpoint(
+        #     self.custom_bert_encoder(self.sentence_encoder),
+        #     src,
+        #     segs,
+        #     clss,
+        #     mask_src,
+        #     mask_cls
+        # )
+        #
+        # sent_score = checkpoint.checkpoint(
+        #     self.custom_sent_decider(self.sentence_predictor),
+        #     encoded,
+        #     mask_cls,
+        # )
+
         if self.is_joint:
             sect_scores = self.section_predictor(encoded, mask_cls)
             return sent_score, sect_scores, mask_cls
+
         else:
             return sent_score, mask_cls
 
@@ -200,8 +249,9 @@ class SentenceEncoder(nn.Module):
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
 
         # if checkpoint is not None:
-        #     # import pdb;pdb.set_trace()
+        #     import pdb;pdb.set_trace()
         #     self.load_state_dict(checkpoint['model'], strict=True)
+
         # else:
         #     if args.param_init != 0.0:
         #         for p in self.ext_transformer_layer.parameters():
@@ -215,6 +265,12 @@ class SentenceEncoder(nn.Module):
 
     def forward(self, src, segs, clss, mask_src, mask_cls):
         top_vec = self.bert(src, segs, mask_src)
+
+        # top_vec = checkpoint.checkpoint(
+        #     self.custom_sent_decider(self.bert),
+        #     src, segs, mask_src
+        # )
+
         sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss]
         sents_vec = sents_vec * mask_cls[:, :, None].float()
         encoded_sent = self.ext_transformer_layer(sents_vec, mask_cls)
@@ -238,11 +294,12 @@ class SectionExtLayer(nn.Module):
     def __init__(self):
         super(SectionExtLayer, self).__init__()
         self.wo_2 = nn.Linear(768, 5, bias=True)
-        self.dropout = nn.Dropout(0.5)
+        # self.dropout = nn.Dropout(0.5)
         # self.leakyReLu = nn.LeakyReLU()
 
     def forward(self, x, mask):
-        sent_sect_scores = self.dropout(self.wo_2(x))
+        # sent_sect_scores = self.dropout(self.wo_2(x))
+        sent_sect_scores = self.wo_2(x)
         sent_sect_scores = sent_sect_scores.squeeze(-1) * mask.unsqueeze(2).expand_as(sent_sect_scores).float()
 
         return sent_sect_scores
@@ -255,9 +312,16 @@ class AbsSummarizer(nn.Module):
         self.device = device
         self.bert = Bert(args.large, args.temp_dir, args.finetune_bert)
 
+        if (args.max_pos > 512):
+            my_pos_embeddings = nn.Embedding(args.max_pos, self.bert.model.config.hidden_size)
+            my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
+            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,
+                                                  :].repeat(args.max_pos - 512, 1)
+            self.bert.model.embeddings.position_embeddings = my_pos_embeddings
+
         if bert_from_extractive is not None:
-            self.bert.model.load_state_dict(
-                dict([(n[11:], p) for n, p in bert_from_extractive.items() if n.startswith('bert.model')]), strict=True)
+            # self.bert.model.load_state_dict(dict([(n[11:], p) for n, p in bert_from_extractive.items() if n.startswith('sentence_encoder.bert.model')]), strict=True)
+            self.bert.model.load_state_dict(dict([(n[28:], p) for n, p in bert_from_extractive.items() if n.startswith('sentence_encoder.bert.model')]), strict=True)
 
         if (args.encoder == 'baseline'):
             bert_config = BertConfig(self.bert.model.config.vocab_size, hidden_size=args.enc_hidden_size,
@@ -267,12 +331,7 @@ class AbsSummarizer(nn.Module):
                                      attention_probs_dropout_prob=args.enc_dropout)
             self.bert.model = BertModel(bert_config)
 
-        if (args.max_pos > 512):
-            my_pos_embeddings = nn.Embedding(args.max_pos, self.bert.model.config.hidden_size)
-            my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
-            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,
-                                                  :].repeat(args.max_pos - 512, 1)
-            self.bert.model.embeddings.position_embeddings = my_pos_embeddings
+
         self.vocab_size = self.bert.model.config.vocab_size
         tgt_embeddings = nn.Embedding(self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0)
         if (self.args.share_emb):
@@ -287,7 +346,11 @@ class AbsSummarizer(nn.Module):
         self.generator[0].weight = self.decoder.embeddings.weight
 
         if checkpoint is not None:
+            # import pdb;pdb.set_trace()
             self.load_state_dict(checkpoint['model'], strict=True)
+            # self.decoder.load_state_dict()
+            # self.decoder.load_state_dict(dict([(n[8:], p) for n, p in checkpoint['model'].items() if n.startswith('decoder.')]), strict=True)
+
         else:
             for module in self.decoder.modules():
                 if isinstance(module, (nn.Linear, nn.Embedding)):
@@ -310,7 +373,32 @@ class AbsSummarizer(nn.Module):
 
         self.to(device)
 
+    def custom(self, module):
+        def custom_forward(*inputs):
+            """
+
+            :param inputs: 0: tgt, 1: top_vec, 2:src
+            :type inputs:
+            :return:
+            :rtype:
+            """
+            output = module(inputs[0][:, :-1], inputs[1], inputs[2])
+            return output[0], output[1]
+
+        return custom_forward
+
     def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
+        # top_vec = self.bert(src, segs, mask_src)
+        #
+        # # decoder_outputs = checkpoint.checkpoint(
+        # #     self.custom(self.decoder), tgt, top_vec, src
+        # # )
+        # dec_state = self.decoder.init_decoder_state(src, top_vec)
+        # # decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
+        # decoder_outputs = self.decoder(tgt[:, :-1], top_vec, dec_state)
+        #
+        #
+        # return decoder_outputs, None
         top_vec = self.bert(src, segs, mask_src)
         dec_state = self.decoder.init_decoder_state(src, top_vec)
         decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
