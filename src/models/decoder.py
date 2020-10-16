@@ -227,7 +227,8 @@ class TransformerDecoder(nn.Module):
 
         # Run the forward pass of the TransformerDecoder.
         # emb = self.embeddings(tgt, step=step)
-        emb = self.embeddings(tgt)
+        # emb = self.embeddings(tgt.long())
+        emb = self.embeddings(tgt.long())
         assert emb.dim() == 3  # len x batch x embedding_dim
 
         output = self.pos_emb(emb, step)
@@ -254,27 +255,27 @@ class TransformerDecoder(nn.Module):
                 if state.previous_input is not None:
                     prev_layer_input = state.previous_layer_inputs[i]
 
-            # output, all_input \
-            #     = self.transformer_layers[i](
-            #     output, src_memory_bank,
-            #     src_pad_mask, tgt_pad_mask,
-            #     previous_input=prev_layer_input,
-            #     layer_cache=state.cache["layer_{}".format(i)]
-            #     if state.cache is not None else None,
-            #     step=step)
+            output, all_input \
+                = self.transformer_layers[i](
+                output, src_memory_bank,
+                src_pad_mask, tgt_pad_mask,
+                previous_input=prev_layer_input,
+                layer_cache=state.cache["layer_{}".format(i)]
+                if state.cache is not None else None,
+                step=step)
 
             # import pdb;pdb.set_trace()
             state_cache = state.cache["layer_{}".format(i)] \
                 if state.cache is not None else None
             # import pdb;pdb.set_trace()
 
-            output, all_input \
-                = checkpoint.checkpoint(
-                self.custom(self.transformer_layers[i]),
-                output, src_memory_bank,
-                src_pad_mask, tgt_pad_mask, prev_layer_input,
-                state_cache, step
-            )
+            # output, all_input \
+            #     = checkpoint.checkpoint(
+            #     self.custom(self.transformer_layers[i]),
+            #     output, src_memory_bank,
+            #     src_pad_mask, tgt_pad_mask, prev_layer_input,
+            #     state_cache, step
+            # )
 
             # import pdb;pdb.set_trace()
 

@@ -33,6 +33,10 @@ if __name__ == '__main__':
     parser.add_argument("-bert_data_path", default='../bert_data_new/cnndm')
     parser.add_argument("-model_path", default='../models/')
     parser.add_argument("-result_path", default='../results/cnndm')
+
+    parser.add_argument("-model_name", default='bert')
+    parser.add_argument("-result_path_test", default='')
+
     parser.add_argument("-bart_dir_out", default='')
     parser.add_argument("-temp_dir", default='../temp')
 
@@ -60,6 +64,7 @@ if __name__ == '__main__':
     parser.add_argument("-dec_hidden_size", default=768, type=int)
 
     parser.add_argument("-dec_heads", default=8, type=int)
+    parser.add_argument("-idx_num", default=0, type=int)
     # parser.add_argument("-dec_heads", default=4, type=int)
     parser.add_argument("-dec_ff_size", default=2048, type=int)
     # parser.add_argument("-dec_ff_size", default=1024, type=int)
@@ -80,15 +85,16 @@ if __name__ == '__main__':
     parser.add_argument("-generator_shard_size", default=32, type=int)
     parser.add_argument("-alpha",  default=0.6, type=float)
     parser.add_argument("-beam_size", default=5, type=int)
-    parser.add_argument("-min_length", default=50, type=int)
+    parser.add_argument("-min_length", default=500, type=int)
     parser.add_argument("-max_length", default=600, type=int)
-    parser.add_argument("-max_tgt_len", default=900, type=int)
+    parser.add_argument("-max_tgt_len", default=1000, type=int)
 
 
 
     parser.add_argument("-param_init", default=0, type=float)
     parser.add_argument("-param_init_glorot", type=str2bool, nargs='?',const=True,default=True)
     parser.add_argument("-optim", default='adam', type=str)
+    parser.add_argument("-log_folds", default='', type=str)
     parser.add_argument("-lr", default=1, type=float)
     parser.add_argument("-beta1", default= 0.9, type=float)
     parser.add_argument("-beta2", default=0.999, type=float)
@@ -115,10 +121,13 @@ if __name__ == '__main__':
     parser.add_argument("-test_start_from", default=-1, type=int)
 
     parser.add_argument("-train_from", default='')
+    parser.add_argument("-exp_set", default='')
+    parser.add_argument("-fold_base_dir", default='')
     parser.add_argument("-report_rouge", type=str2bool, nargs='?',const=True,default=True)
     parser.add_argument("-block_trigram", type=str2bool, nargs='?', const=True, default=True)
 
     parser.add_argument("-section_prediction", action='store_true')
+    parser.add_argument("-rg_predictor", action='store_true')
 
 
     ############
@@ -127,7 +136,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.gpu_ranks = [int(i) for i in range(len(args.visible_gpus.split(',')))]
     args.world_size = len(args.gpu_ranks)
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.visible_gpus
+    # os.environ["CUDA_VISIBLE_DEVICES"] = args.visible_gpus
+    # os.environ["CUDA_VISIBLE_DEVICES"] =
 
     init_logger(args.log_file)
     device = "cpu" if args.visible_gpus == '-1' else "cuda"

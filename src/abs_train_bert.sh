@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #BERT_DATA_PATH=/home/sajad/datasets/longsumm/bs-bert-data/
 #BERT_DATA_PATH=/home/sajad/datasets/longsumm/bs-bert-data-bert/
-MODEL_PATH=/disk1/sajad/sci-trained-models/presum/lsum-abs-first-phase-test/
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/lsum-oracle-abs/
 #BERT_DATA_PATH=/home/sajad/datasets/longsumm/bs-bert-data-ext-phase2/
 #BERT_DATA_PATH_BRUNELLO=/disk1/sajad/datasets/sci/lsum/bert-files/bs-bert-data-ext-phase2/
-BERT_DIR_PATH=/home/sajad/datasets/longsumm/bertUncased-data-1100/
+BERT_DIR_PATH=/home/sajad/datasets/longsumm/new-abs-set/splits/bert-files/oracle/
 #BERT_DIR_PATH=/home/sajad/datasets/longsumm/bs-bert-data-phase1-1100/
 
 

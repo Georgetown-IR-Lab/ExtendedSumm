@@ -3,9 +3,10 @@ import torch
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 
-
+from transformers import get_linear_schedule_with_warmup
 # from onmt.utils import use_gpu
 # from models.adam import Adam
+from models.adam import Adam
 
 
 def use_gpu(opt):
@@ -28,6 +29,7 @@ def build_optim(model, opt, checkpoint):
         # optim.optimizer.state_dict()
         saved_optimizer_state_dict = optim.optimizer.state_dict()
     else:
+
         optim = Optimizer(
             opt.optim, opt.learning_rate, opt.max_grad_norm,
             lr_decay=opt.learning_rate_decay,
@@ -164,10 +166,13 @@ class Optimizer(object):
         elif self.method == 'adadelta':
             self.optimizer = optim.Adadelta(self.params, lr=self.learning_rate)
         elif self.method == 'adam':
-            self.optimizer = optim.Adam(self.params, lr=self.learning_rate,
+            self.optimizer = Adam(self.params, lr=self.learning_rate,
                                         betas=self.betas, eps=1e-9)
         else:
             raise RuntimeError("Invalid optim method: " + self.method)
+
+        # self.scheduler = get_linear_schedule_with_warmup(self.optimizer, self.warmup_steps, 100000)
+
 
     def _set_rate(self, learning_rate):
         self.learning_rate = learning_rate
@@ -184,8 +189,9 @@ class Optimizer(object):
         rate.
         """
         self._step += 1
+
         # log this, gradient update
-        # report_stats.maybe_log_tensorboard(report_stats, 'Opt/training', learning_rate=1, step=self._step, report_rl=False)
+        # report_stats.maybe_log_tensorboard(report_stats, 'Opt/training-opt', learning_rate=self.learning_rate, step=self._step, report_rl=False)
         # Decay method used in tensor2tensor.
         if self.decay_method == "noam":
             self._set_rate(
@@ -208,5 +214,7 @@ class Optimizer(object):
         if self.max_grad_norm:
             clip_grad_norm_(self.params, self.max_grad_norm)
         self.optimizer.step()
+        # self.scheduler.step()
+        self.learning_rate = self.optimizer.param_groups[0]['lr']
 
 

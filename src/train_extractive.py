@@ -188,7 +188,7 @@ def test_ext(args, device_id, pt, step, is_joint=False):
     print(args)
 
     def test_iter_fct():
-        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=False), args.test_batch_size, device,
+        return data_loader.Dataloader(args, load_dataset(args, args.exp_set, shuffle=False), args.test_batch_size, device,
                                       shuffle=False, is_test=True)
 
     model = ExtSummarizer(args, device, checkpoint, is_joint=is_joint)
@@ -200,7 +200,8 @@ def test_ext(args, device_id, pt, step, is_joint=False):
     trainer = build_trainer(args, device_id, model, None)
     # trainer.test(test_iter, step)
     # trainer.test(test_iter_fct, step)
-    trainer.test(test_iter_fct, step)
+    trainer.validate_rouge(test_iter_fct, step)
+    # trainer.validate_cls(test_iter_fct, step)
 
 def train_ext(args, device_id, is_joint=False):
     if (args.world_size > 1):
@@ -240,11 +241,14 @@ def train_single_ext(args, device_id, is_joint=False):
         checkpoint = None
 
     def train_iter_fct():
-        return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
+        return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=False), args.batch_size, device,
                                       shuffle=True, is_test=False)
     def val_iter_fct():
-        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=False), 1, device,
-                                      shuffle=True, is_test=True)
+        return data_loader.Dataloader(args, load_dataset(args, 'val', shuffle=False), args.test_batch_size, device,
+                                      shuffle=False, is_test=True)
+    def test_iter_fct():
+        return data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False), args.test_batch_size, device,
+                                      shuffle=False, is_test=True)
 
     model = ExtSummarizer(args, device, checkpoint, is_joint)
     optim = model_builder.build_optim(args, model, checkpoint)
@@ -253,3 +257,5 @@ def train_single_ext(args, device_id, is_joint=False):
 
     trainer = build_trainer(args, device_id, model, optim)
     trainer.train(train_iter_fct, args.train_steps, valid_iter_fct=val_iter_fct)
+
+    test_ext(args, device_id, args.model_path + '/model_step_' + str(trainer.best_val_step) + '.pt', trainer.best_val_step, is_joint)

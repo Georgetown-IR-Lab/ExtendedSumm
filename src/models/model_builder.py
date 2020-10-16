@@ -2,14 +2,16 @@ import copy
 
 import torch
 import torch.nn as nn
-from transformers import BertModel, BertConfig
 # from pytorch_transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 from torch.utils import checkpoint
+# from torch.autograd import Variable
+from transformers import BertModel, BertConfig, LongformerModel
 
-from models.decoder import TransformerDecoder, TransformerDecoderState
-from models.encoder import Classifier, ExtTransformerEncoder
+from models.decoder import TransformerDecoder
+from models.encoder import ExtTransformerEncoder
 from models.optimizers import Optimizer
+from models.uncertainty_loss import UncertaintyLoss
 
 
 def build_optim(args, model, checkpoint):
@@ -116,50 +118,64 @@ def get_generator(vocab_size, dec_hidden_size, device):
 
 
 class Bert(nn.Module):
-    def __init__(self, large, temp_dir, finetune=False):
+    def __init__(self, large, model_name, temp_dir, finetune=False):
         super(Bert, self).__init__()
-        if (large):
-            self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
-        else:
-            # self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
-            self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
+        if model_name == 'bert':
+            if (large):
+                self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
+            else:
+                self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
+                # config = BertConfig.from_pretrained('allenai/scibert_scivocab_uncased')
+                # config.gradient_checkpointing = True
+                # self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir, config=config)
+                # self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
 
+        elif model_name=='scibert':
+                self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
+
+        elif model_name == 'longformer':
+            if large:
+                self.model = LongformerModel.from_pretrained('allenai/longformer-large-4096', cache_dir=temp_dir)
+            else:
+                self.model = LongformerModel.from_pretrained('allenai/longformer-base-4096', cache_dir=temp_dir)
+
+        self.model_name = model_name
         self.finetune = finetune
 
-    def custom_sent_decider(self, module):
-        def custom_forward(*inputs):
-            output,_ = module(inputs[0],
-                            attention_mask=inputs[1],
-                            token_type_ids=inputs[2],
-                            )
-            return output
 
-        return custom_forward
-
-    def forward(self, x, segs, mask):
+    def forward(self, x, segs, mask_src, mask_cls, clss):
         if (self.finetune):
 
-            top_vec, _ = self.model(x, attention_mask=mask, token_type_ids=segs)
+            if self.model_name =='bert' or self.model_name =='scibert':
+                top_vec, _ = self.model(x, attention_mask=mask_src, token_type_ids=segs)
 
-            # top_vec = checkpoint.checkpoint(
-            #     self.custom_sent_decider(self.model),
-            #     x, mask, segs,
-            # )
+            elif self.model_name=='longformer':
+                global_mask = torch.zeros(mask_src.shape, dtype=torch.long, device='cuda').unsqueeze(0)
+                global_mask[:,:,clss.long()] = 1
+                global_mask = global_mask.squeeze(0)
+                top_vec, _ = self.model(x, attention_mask=mask_src.long(), global_attention_mask=global_mask.long())
+                # top_vec, _ = self.model(x, attention_mask=mask_src)
 
         else:
             self.eval()
             with torch.no_grad():
-                top_vec, _ = self.model(x, attention_mask=mask, token_type_ids=segs)
+                top_vec, _ = self.model(x, attention_mask=mask_src, token_type_ids=segs)
+
         return top_vec
 
 
 class ExtSummarizer(nn.Module):
-    def __init__(self, args, device, checkpoint, is_joint=False):
+    def __init__(self, args, device, checkpoint, is_joint=True):
         super(ExtSummarizer, self).__init__()
         self.is_joint = is_joint
-
         self.sentence_encoder = SentenceEncoder(args, device, checkpoint)
         self.sentence_predictor = SentenceExtLayer()
+
+        if is_joint:
+            self.uncertainty_loss = UncertaintyLoss()
+
+        if not is_joint:
+            self.bin_loss = torch.nn.BCELoss(reduction='none')
 
         # for p in self.sentence_encoder.parameters():
         #     if p.dim() > 1:
@@ -169,7 +185,31 @@ class ExtSummarizer(nn.Module):
             self.section_predictor = SectionExtLayer()
 
         if checkpoint is not None:
+            # if self.is_joint:
+            #     for p in self.section_predictor.parameters():
+            #         if p.dim() > 1:
+            #             xavier_uniform_(p)
+            #
+            # pretrained_dict = {k: v for k, v in checkpoint['model'].items() if k in self.state_dict()}
+            # pretrained_dict['section_predictor.wo_2.weight'] = self.state_dict()['section_predictor.wo_2.weight']
+            # pretrained_dict['section_predictor.wo_2.bias'] = self.state_dict()['section_predictor.wo_2.bias']
+            # self.load_state_dict(pretrained_dict, strict=True)
+            #
             self.load_state_dict(checkpoint['model'], strict=True)
+            # list = []
+            # for key, val in checkpoint['model'].items():
+            #     if key.startswith('bert.model'):
+            #         list.append(('sentence_encoder.' + key, val))
+            #     elif key.startswith('ext_layer'):
+            #         list.append(('sentence_encoder.' + key.replace('ext_layer','ext_transformer_layer'), val))
+            #     # elif key.startswith('sentence_encoder.ext_transformer_layer.wo'):
+            #     #     list.append((key.replace('sentence_encoder.ext_transformer_layer','sentence_predictor'), val))
+            # for j, (key, val) in enumerate(list):
+            #     if key.startswith('sentence_encoder.ext_transformer_layer.wo'):
+            #         list[j] = (key.replace('sentence_encoder.ext_transformer_layer','sentence_predictor'), val)
+            #
+            # # import pdb;pdb.set_trace()
+            # self.load_state_dict(dict(list), strict=True)
         else:
             for p in self.sentence_predictor.parameters():
                 if p.dim() > 1:
@@ -185,43 +225,28 @@ class ExtSummarizer(nn.Module):
 
 
 
-    def custom_bert_encoder(self, module):
-        def custom_forward(*inputs):
-            output = module(inputs[0],
-                            inputs[1],
-                            inputs[2],
-                            inputs[3],
-                            inputs[4],
-                            )
-            return output
+    def forward(self, src, segs, clss, mask_src, mask_cls, sent_bin_labels, sent_sect_labels, is_inference=False):
 
-        return custom_forward
-
-    def forward(self, src, segs, clss, mask_src, mask_cls):
         encoded = self.sentence_encoder(src, segs, clss, mask_src, mask_cls)
-        sent_score = self.sentence_predictor(encoded, mask_cls)
+        # import pdb;pdb.set_trace()
 
-        # encoded = checkpoint.checkpoint(
-        #     self.custom_bert_encoder(self.sentence_encoder),
-        #     src,
-        #     segs,
-        #     clss,
-        #     mask_src,
-        #     mask_cls
-        # )
-        #
-        # sent_score = checkpoint.checkpoint(
-        #     self.custom_sent_decider(self.sentence_predictor),
-        #     encoded,
-        #     mask_cls,
-        # )
+
+        sent_score = self.sentence_predictor(encoded, mask_cls)
 
         if self.is_joint:
             sect_scores = self.section_predictor(encoded, mask_cls)
-            return sent_score, sect_scores, mask_cls
+            loss, loss_sent, loss_sect = self.uncertainty_loss(sent_score, sent_bin_labels, sect_scores, sent_sect_labels, mask=mask_cls)
+
+            return sent_score * self.uncertainty_loss.alpha[0], sect_scores * self.uncertainty_loss.alpha[1], mask_cls, loss, loss_sent, loss_sect
 
         else:
-            return sent_score, mask_cls
+
+            loss = self.bin_loss(sent_score, sent_bin_labels.float())
+            loss = (loss * mask_cls.float()).sum()
+            if not is_inference:
+                loss = loss / loss.numel()
+
+            return sent_score, mask_cls, loss, None, None
 
 
 class SentenceEncoder(nn.Module):
@@ -229,25 +254,29 @@ class SentenceEncoder(nn.Module):
         super(SentenceEncoder, self).__init__()
         self.args = args
         self.device = device
-        self.bert = Bert(args.large, args.temp_dir, args.finetune_bert)
+        self.bert = Bert(args.large, args.model_name, args.temp_dir, args.finetune_bert)
         self.ext_transformer_layer = ExtTransformerEncoder(self.bert.model.config.hidden_size, args.ext_ff_size,
                                                            args.ext_heads,
                                                            args.ext_dropout, args.ext_layers)
 
-        if (args.encoder == 'baseline'):
-            bert_config = BertConfig(self.bert.model.config.vocab_size, hidden_size=args.ext_hidden_size,
-                                     num_hidden_layers=args.ext_layers, num_attention_heads=args.ext_heads,
-                                     intermediate_size=args.ext_ff_size)
-            self.bert.model = BertModel(bert_config)
-            self.ext_transformer_layer = Classifier(self.bert.model.config.hidden_size)
-
-        if (args.max_pos > 512):
+        if args.max_pos > 512 and args.model_name=='bert':
             my_pos_embeddings = nn.Embedding(args.max_pos, self.bert.model.config.hidden_size)
+            import pdb;pdb.set_trace()
+
             my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
             my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,
                                                   :].repeat(args.max_pos - 512, 1)
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
 
+
+        if args.max_pos > 4096 and args.model_name=='longformer':
+            my_pos_embeddings = nn.Embedding(args.max_pos+2, self.bert.model.config.hidden_size)
+            my_pos_embeddings.weight.data[:4097] = self.bert.model.embeddings.position_embeddings.weight.data[:-1]
+            my_pos_embeddings.weight.data[4097:] = self.bert.model.embeddings.position_embeddings.weight.data[1:args.max_pos +2 - 4096]
+            self.bert.model.embeddings.position_embeddings = my_pos_embeddings
+
+
+        self.sigmoid = nn.Sigmoid()
         # if checkpoint is not None:
         #     import pdb;pdb.set_trace()
         #     self.load_state_dict(checkpoint['model'], strict=True)
@@ -264,16 +293,17 @@ class SentenceEncoder(nn.Module):
         # self.to(device)
 
     def forward(self, src, segs, clss, mask_src, mask_cls):
-        top_vec = self.bert(src, segs, mask_src)
+        # self.eval()
 
+        top_vec = self.bert(src, segs, mask_src, mask_cls, clss)
         # top_vec = checkpoint.checkpoint(
         #     self.custom_sent_decider(self.bert),
         #     src, segs, mask_src
         # )
-
-        sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss]
+        sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss.long()]
         sents_vec = sents_vec * mask_cls[:, :, None].float()
         encoded_sent = self.ext_transformer_layer(sents_vec, mask_cls)
+        # import pdb;pdb.set_trace()
         return encoded_sent
 
 
@@ -282,9 +312,26 @@ class SentenceExtLayer(nn.Module):
         super(SentenceExtLayer, self).__init__()
         self.wo = nn.Linear(768, 1, bias=True)
         self.sigmoid = nn.Sigmoid()
+        #
+        # self.seq_model = nn.Sequential(
+        #     nn.Linear(768, 1, bias=True),
+        #     nn.Sigmoid()
+        # )
+
+    # def custom_sent_decider(self, module):
+    #     def custom_forward(*inputs):
+    #         output = module(inputs[0], inputs[1])
+    #         return output
+    #
+    #     return custom_forward
 
     def forward(self, x, mask):
+        # sent_scores = self.seq_model(x)
         sent_scores = self.sigmoid(self.wo(x))
+
+        # modules = [module for k, module in self.seq_model._modules.items()]
+        # input_var = torch.autograd.Variable(x, requires_grad=True)
+        # sent_scores = checkpoint_sequential(modules, 2, input_var)
         sent_scores = sent_scores.squeeze(-1) * mask.float()
 
         return sent_scores
@@ -294,6 +341,7 @@ class SectionExtLayer(nn.Module):
     def __init__(self):
         super(SectionExtLayer, self).__init__()
         self.wo_2 = nn.Linear(768, 5, bias=True)
+        #
         # self.dropout = nn.Dropout(0.5)
         # self.leakyReLu = nn.LeakyReLU()
 
@@ -318,6 +366,9 @@ class AbsSummarizer(nn.Module):
             my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,
                                                   :].repeat(args.max_pos - 512, 1)
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
+
+
+
 
         if bert_from_extractive is not None:
             # self.bert.model.load_state_dict(dict([(n[11:], p) for n, p in bert_from_extractive.items() if n.startswith('sentence_encoder.bert.model')]), strict=True)
@@ -373,7 +424,7 @@ class AbsSummarizer(nn.Module):
 
         self.to(device)
 
-    def custom(self, module):
+    def custom(self, module, outs):
         def custom_forward(*inputs):
             """
 
@@ -382,24 +433,43 @@ class AbsSummarizer(nn.Module):
             :return:
             :rtype:
             """
-            output = module(inputs[0][:, :-1], inputs[1], inputs[2])
-            return output[0], output[1]
+            output = module(inputs[0][:, :-1], inputs[1], outs[0])
+            outs.append(output[1])
+            return output[0]
+
+        return custom_forward
+
+    def custom_bert(self, module):
+        def custom_forward(*inputs):
+            """
+
+            :param inputs: 0: tgt, 1: top_vec, 2:src
+            :type inputs:
+            :return:
+            :rtype:
+            """
+            output = module(*inputs)
+            return output
 
         return custom_forward
 
     def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
+
+        # return decoder_outputs, None
+
         # top_vec = self.bert(src, segs, mask_src)
         #
-        # # decoder_outputs = checkpoint.checkpoint(
-        # #     self.custom(self.decoder), tgt, top_vec, src
-        # # )
-        # dec_state = self.decoder.init_decoder_state(src, top_vec)
-        # # decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
-        # decoder_outputs = self.decoder(tgt[:, :-1], top_vec, dec_state)
-        #
-        #
-        # return decoder_outputs, None
-        top_vec = self.bert(src, segs, mask_src)
+        top_vec = checkpoint.checkpoint(
+            self.custom_bert(self.bert), src.float().requires_grad_(), segs.float().requires_grad_(), mask_src.float().requires_grad_(),
+        )
+
         dec_state = self.decoder.init_decoder_state(src, top_vec)
+        # outs = []
+        # outs.append(dec_state)
+
+        # decoder_outputs = checkpoint.checkpoint(
+        #     self.custom(self.decoder, outs), tgt.float().requires_grad_(), top_vec.float().requires_grad_(),
+        # )
+        # state = outs[1]
         decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
         return decoder_outputs, None

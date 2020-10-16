@@ -13,7 +13,8 @@ from others.logging import logger
 # from others.tokenization import BertTokenizer
 from transformers import BertTokenizer
 from others.utils import test_rouge, rouge_results_to_str
-import utils.rouge
+# import utils.rouge
+from utils.rouge_score import evaluate_rouge
 
 
 def _tally_parameters(model):
@@ -176,7 +177,7 @@ class Trainer(object):
                             self._save(step)
 
                         if (step % self.args.val_interval == 0):
-                            _, is_best = self.validate(valid_iter_fct, step)
+                            _, is_best = self.validate_rouge(valid_iter_fct, step)
                             if is_best:
                                 self._save(step)
                                 logger.info('Best model saved at step %d' % step)
@@ -191,12 +192,12 @@ class Trainer(object):
         return total_stats
 
     def _report_rouge(self, predictions, references):
-        r1, r2, rl, r1_cf, r2_cf, rl_cf = utils.rouge.get_rouge(predictions, references, use_cf=True)
+        r1, r2, rl = evaluate_rouge(predictions, references)
         # print("{} set results:\n".format(args.filename))
         logger.info("Metric\tScore\t95% CI")
-        logger.info("ROUGE-1\t{:.2f}\t({:.2f},{:.2f})".format(r1, r1_cf[0] - r1, r1_cf[1] - r1))
-        logger.info("ROUGE-2\t{:.2f}\t({:.2f},{:.2f})".format(r2, r2_cf[0] - r2, r2_cf[1] - r2))
-        logger.info("ROUGE-L\t{:.2f}\t({:.2f},{:.2f})".format(rl, rl_cf[0] - rl, rl_cf[1] - rl))
+        logger.info("ROUGE-1\t{:.2f}\t({:.2f},{:.2f})".format(r1, 0, 0))
+        logger.info("ROUGE-2\t{:.2f}\t({:.2f},{:.2f})".format(r2, 0, 0))
+        logger.info("ROUGE-L\t{:.2f}\t({:.2f},{:.2f})".format(rl, 0, 0))
         return r1, r2, rl
 
     def validate(self, valid_iter_fct, step=0):
@@ -294,12 +295,10 @@ class Trainer(object):
     def val_abs(self, args, iter_fct, step):
         self.model.eval()
 
-        # tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
-        # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
         symbols = {'BOS': self.tokenizer.vocab['[unused0]'], 'EOS': self.tokenizer.vocab['[unused1]'],
                    'PAD': self.tokenizer.vocab['[PAD]'], 'EOQ': self.tokenizer.vocab['[unused2]']}
         predictor = build_predictor(args, self.tokenizer, symbols, self.model, logger)
-        return predictor.translate(iter_fct, step, return_entities = True)
+        return predictor.translate(iter_fct, step, return_entities=True)
 
     def _gradient_accumulation(self, true_batchs, normalization, total_stats,
                                report_stats):

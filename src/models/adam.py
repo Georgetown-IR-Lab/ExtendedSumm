@@ -52,11 +52,10 @@ class Adam(Optimizer):
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
         """
+
         loss = None
         if closure is not None:
             loss = closure()
-
-
         for group in self.param_groups:
             for p in group['params']:
                 if p.grad is None:
@@ -80,8 +79,8 @@ class Adam(Optimizer):
 
                 # Decay the first and second moment running average coefficient
                 # In-place operations to update the averages at the same time
-                next_m.mul_(beta1).add_(1 - beta1, grad)
-                next_v.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                next_m.mul_(beta1).add_(grad, alpha=1 - beta1)
+                next_v.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
                 update = next_m / (next_v.sqrt() + group['eps'])
 
                 # Just adding the square of the weights to the loss function is *not*
@@ -97,6 +96,7 @@ class Adam(Optimizer):
                 lr_scheduled = group['lr']
 
                 update_with_lr = lr_scheduled * update
+
                 p.data.add_(-update_with_lr)
 
                 state['step'] += 1

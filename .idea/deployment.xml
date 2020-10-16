@@ -16,6 +16,20 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="barolo-home">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/packages/radsum/baselines/PreSumm" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="barolo-main">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/packages/sum/PreSumm-github" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="barolo-stat">
         <serverdata>
           <mappings>
@@ -23,7 +37,14 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="brunello">
+      <paths name="brunello-home">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/packages/summarization/presum" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="chianti">
         <serverdata>
           <mappings>
             <mapping deploy="/packages/summarization/presum" local="$PROJECT_DIR$" web="/" />

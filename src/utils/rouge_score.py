@@ -29,10 +29,10 @@ def evaluate_rouge(hypotheses, references):
     for j, hyp in enumerate(hypotheses):
         submission_summary = hyp.replace('<q>', ' ')
 
-        submission_summary = impose_max_length(submission_summary)
-        ground_truth_summary = impose_max_length(references[j].replace('<q>',' '))
+        # submission_summary = impose_max_length(submission_summary)
+        # ground_truth_summary = impose_max_length(references[j].replace('<q>',' '))
 
-        scores = scorer.score(ground_truth_summary.strip(), submission_summary.strip())
+        scores = scorer.score(references[j].strip(), submission_summary.strip())
 
         for metric in metrics:
             results[metric + "_f"].append(scores[metric].fmeasure)

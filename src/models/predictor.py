@@ -11,8 +11,8 @@ import torch
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
-import utils.rouge
-from others.utils import rouge_results_to_str, test_rouge, tile
+# import utils.rouge
+# from others.utils import rouge_results_to_str, test_rouge, tile
 from translate.beam import GNMTGlobalScorer
 
 
@@ -168,10 +168,11 @@ class Translator(object):
 
                 # for trans in translations:
                 for p_id, trans in zip(paper_id, translations):
-
                     pred, gold, src = trans
+
                     pred_str = pred.replace('[unused0]', '').replace('[unused3]', '').replace('[PAD]', '').replace('[unused1]', '').replace(r' +', ' ').replace(' [unused2] ', '<q>').replace('[unused2]', '').strip()
                     # print(pred_str)
+
                     gold_str = gold.strip()
                     if(self.args.recall_eval):
                         _pred_str = ''
@@ -186,7 +187,6 @@ class Translator(object):
                             else:
                                 gap = can_gap
                                 _pred_str = can_pred_str
-
 
                     if p_id not in paper_summaries.keys():
                         paper_summaries[p_id] = pred_str
@@ -297,7 +297,7 @@ class Translator(object):
         results["gold_score"] = [0] * batch_size
         results["batch"] = batch
         # for step in tqdm(range(max_length), total=max_length):
-        for step in range(max_length):
+        for step in range(800):
             decoder_input = alive_seq[:, -1].view(1, -1)
 
             # Decoder forward.

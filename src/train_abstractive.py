@@ -14,7 +14,6 @@ import time
 import torch
 # from pytorch_transformers import BertTokenizer
 from transformers import BertTokenizer
-from apex import amp
 
 import distributed
 from models import data_loader, model_builder
@@ -169,11 +168,12 @@ def validate_abs(args, device_id):
 
 def validate(args, device_id, pt, step):
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
-    if (pt != ''):
-        test_from = pt
-    else:
-        test_from = args.test_from
+    # if (pt != ''):
+    #     test_from = pt
+    # else:
+    test_from = args.test_from
     logger.info('Loading checkpoint from %s' % test_from)
+
     checkpoint = torch.load(test_from, map_location=lambda storage, loc: storage)
     opt = vars(checkpoint['opt'])
     for k in opt.keys():
@@ -184,9 +184,10 @@ def validate(args, device_id, pt, step):
     model = AbsSummarizer(args, device, checkpoint)
     model.eval()
 
-    valid_iter = data_loader.Dataloader(args, load_dataset(args, 'valid', shuffle=False),
-                                        args.batch_size, device,
-                                        shuffle=False, is_test=False)
+    def valid_iter():
+        return data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
+                                            args.batch_size, device,
+                                            shuffle=False, is_test=True)
 
     # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
     tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)
@@ -196,7 +197,7 @@ def validate(args, device_id, pt, step):
     valid_loss = abs_loss(model.generator, symbols, model.vocab_size, train=False, device=device)
 
     trainer = build_trainer(args, device_id, model, None, valid_loss)
-    stats = trainer.validate(valid_iter, step)
+    stats = trainer.validate_rouge(valid_iter, step)
     return stats.total_loss()
 
 
@@ -240,7 +241,7 @@ def test_abs(args, device_id, pt, step):
     symbols = {'BOS': tokenizer.vocab['[unused0]'], 'EOS': tokenizer.vocab['[unused1]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused2]']}
     predictor = build_predictor(args, tokenizer, symbols, model, logger)
-    predictor.translate(train_iter_fct, step)
+    predictor.translate(test_iter_fct, step)
 
 
 def test_text_abs(args, device_id, pt, step):
@@ -343,7 +344,7 @@ def train_abs_single(args, device_id):
     else:
         optim = [model_builder.build_optim(args, model, checkpoint)]
 
-    model, optimizer = amp.initialize(model, optim[0].optimizer, opt_level="O1")
+    # model, optimizer = amp.initialize(model, optim[0].optimizer, opt_level="O1")
     logger.info(model)
 
     # tokenizer = BertTokenizer.from_pretrained('/disk1/sajad/pretrained-bert/scibert_scivocab_uncased', do_lower_case=True, cache_dir=args.temp_dir)

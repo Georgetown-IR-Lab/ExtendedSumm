@@ -53,7 +53,7 @@ class ReportMgrBase(object):
     def log(self, *args, **kwargs):
         logger.info(*args, **kwargs)
 
-    def report_training(self, step, num_steps, learning_rate,
+    def report_training(self, step, num_steps, learning_rate, alpha_1, alpha2,
                         report_stats, is_joint=False, multigpu=False):
         """
         This is the user-defined batch-level traing progress
@@ -70,13 +70,12 @@ class ReportMgrBase(object):
         if self.start_time < 0:
             raise ValueError("""ReportMgr needs to be started
                                 (set 'start_time' or use 'start()'""")
-
         if step % self.report_every == 0:
             if multigpu:
                 report_stats = \
                     Statistics.all_gather_stats(report_stats)
             self._report_training(
-                step, num_steps, learning_rate, report_stats)
+                step, num_steps, learning_rate, alpha_1, alpha2, report_stats)
             self.progress_step += 1
             return Statistics(print_traj=is_joint)
         else:
@@ -86,7 +85,7 @@ class ReportMgrBase(object):
         """ To be overridden """
         raise NotImplementedError()
 
-    def report_step(self, lr, step, train_stats=None, valid_stats=None):
+    def report_step(self, lr, alpha1, alpha2, step, train_stats=None, valid_stats=None):
         """
         Report stats of a step
 
@@ -96,7 +95,7 @@ class ReportMgrBase(object):
             lr(float): current learning rate
         """
         self._report_step(
-            lr, step, train_stats=train_stats, valid_stats=valid_stats)
+            lr, alpha1, alpha2, step, train_stats=train_stats, valid_stats=valid_stats)
 
     def _report_step(self, *args, **kwargs):
         raise NotImplementedError()
@@ -116,12 +115,12 @@ class ReportMgr(ReportMgrBase):
         super(ReportMgr, self).__init__(report_every, start_time)
         self.tensorboard_writer = tensorboard_writer
 
-    def maybe_log_tensorboard(self, stats, prefix, learning_rate, step, report_rl=False):
+    def maybe_log_tensorboard(self, stats, prefix, learning_rate, alpha_1, alpha2, step, report_rl=False):
         if self.tensorboard_writer is not None:
             stats.log_tensorboard(
-                prefix, self.tensorboard_writer, learning_rate, step, report_rl)
+                prefix, self.tensorboard_writer, learning_rate, alpha_1, alpha2, step, report_rl)
 
-    def _report_training(self, step, num_steps, learning_rate,
+    def _report_training(self, step, num_steps, learning_rate, alpha_1, alpha2,
                          report_stats):
         """
         See base class method `ReportMgrBase.report_training`.
@@ -133,6 +132,7 @@ class ReportMgr(ReportMgrBase):
         self.maybe_log_tensorboard(report_stats,
                                    "progress",
                                    learning_rate,
+                                   alpha_1, alpha2,
                                    self.progress_step)
         report_stats = Statistics()
 
@@ -144,7 +144,7 @@ class ReportMgr(ReportMgrBase):
                                    learning_rate=1,
                                    step=step)
 
-    def _report_step(self, lr, step, train_stats=None, valid_stats=None):
+    def _report_step(self, lr, alpha1, alpha2, step, train_stats=None, valid_stats=None):
         """
         See base class method `ReportMgrBase.report_step`.
         """
@@ -167,7 +167,10 @@ class ReportMgr(ReportMgrBase):
             self.maybe_log_tensorboard(valid_stats,
                                        "valid",
                                        lr,
-                                       step, report_rl=True)
+                                       alpha1,
+                                       alpha2,
+                                       step,
+                                       report_rl=True)
 
 
 class Statistics(object):
@@ -306,6 +309,9 @@ class Statistics(object):
         self.r2 = r2
         self.rl = rl
 
+    def set_ir_metrics(self, p):
+        self.p = p
+
     def total_loss(self):
         """ compute cross entropy """
         if (self.n_docs == 0):
@@ -378,7 +384,7 @@ class Statistics(object):
                    time.time() - start))
         else:
             logger.info(
-                ("Step %s; mse_sent: %4.2f (%4.2f/%d), (RMSE-sent:%4.2f); " +
+                ("Step %s; mse_sent: %4.2f (%4.2f/%d), (RMSE-sent:%4.4f); " +
                  "lr: %7.7f; %3.0f docs/s; %6.0f sec")
                 % (step_fmt,
                    self.total_loss(),
@@ -390,7 +396,7 @@ class Statistics(object):
                    time.time() - start))
         sys.stdout.flush()
 
-    def log_tensorboard(self, prefix, writer, learning_rate, step, report_rl=False):
+    def log_tensorboard(self, prefix, writer, learning_rate, alpha_1, alpha2, step, report_rl=False):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/total_loss", self.total_loss(), step)
@@ -400,10 +406,17 @@ class Statistics(object):
         writer.add_scalar(prefix + "/xent_sect", self.xent_sect(), step)
         writer.add_scalar(prefix + "/ACC", self._get_acc_sect(), step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
+        writer.add_scalar(prefix + "/Sentence-Weight", alpha_1, step)
+        writer.add_scalar(prefix + "/Section-Weight", alpha2, step)
+        writer.add_scalar(prefix + "/Optimizer", alpha2, step)
         if report_rl:
             writer.add_scalar(prefix + "/Rouge-1", self.r1, step)
             writer.add_scalar(prefix + "/Rouge-2", self.r2, step)
             writer.add_scalar(prefix + "/Rouge-l", self.rl, step)
+
+            writer.add_scalar(prefix + "/Precision", self.p, step)
+
+
             # writer.add_scalars(prefix + "/Section-wise-acc", {
             #     "Total": self.acc_infos[0],
             #     "Introduction": self.acc_infos[1],

@@ -9,7 +9,7 @@ from others.logging import logger
 
 
 class Batch(object):
-    def _pad(self, data, pad_id, width=-1):
+    def _pad(self, data, pad_id=-1, width=-1):
         if (width == -1):
             width = max(len(d) for d in data)
         rtn_data = [d + [pad_id] * (width - len(d)) for d in data]
@@ -17,20 +17,36 @@ class Batch(object):
 
     def __init__(self, data=None, device=None, is_test=False):
         """Create a Batch from a list of examples."""
+        # if is_test:
+        #     import pdb;
+        #     pdb.set_trace()
+        self.PAD_ID = -1
 
-        def labelize(lists):
+        def labelize(lists, paper_id = ''):
+            pass
+            # for list in lists:
+            #     for j, elem in enumerate(list):
+            #         if elem == 0:
+            #             list[j] = 0
+            #         if elem == 1:
+            #             list[j] = 1
+            #         if elem ==2:
+            #             list[j] = 2
+            #         if elem == 3:
+            #             list[j] = 3
+            #         if elem == 4:
+            #             list[j] = 4
+
+        def labelize_str_convert(lists):
             for list in lists:
                 for j, elem in enumerate(list):
-                    if elem == 1 or elem == 0:
-                        list[j] = 0
-                    if elem==2:
-                        list[j] = 1
-                    if elem == 3 or elem == 4 or elem == 5:
-                        list[j] = 2
-                    # if elem == 5:
-                    #     list[j] = 3
-                    # if elem==5:
-                    #     import pdb;pdb.set_trace()
+
+                    try:
+                        assigned = int(elem)
+                    except:
+                        assigned = 99
+
+                    list[j] = assigned
 
         if data is not None:
             self.batch_size = len(data)
@@ -40,19 +56,32 @@ class Batch(object):
             pre_clss = [x[3] for x in data]
             pre_src_sent_labels = [x[4] for x in data]
             pre_sent_labels = [x[5] for x in data]
-            sent_sect_labels = [x[6] for x in data]
-            labelize(sent_sect_labels)
-            if is_test:
-                sent_sect_labels = [x[8] for x in data]
-                labelize(sent_sect_labels)
-                paper_id = [x[9] for x in data]
+            if not is_test:
+                sent_sect_labels = [x[6] for x in data]
+
+                # for debugging comment it out after!
+                paper_id = [x[-2] for x in data]
+
+
+                # labelize_str_convert(sent_sect_labels)
+                labelize(sent_sect_labels, paper_id)
+            else:
+                if is_test:
+                    sent_sect_labels = [x[8] for x in data]
+                    # labelize_str_convert(sent_sect_labels)
+                    labelize(sent_sect_labels)
+                    paper_id = [x[9] for x in data]
+                    section_rg = [x[10] for x in data]
 
             src = torch.tensor(self._pad(pre_src, 0))
             tgt = torch.tensor(self._pad(pre_tgt, 0))
 
             segs = torch.tensor(self._pad(pre_segs, 0))
-            mask_src = 1 - (src == 0)
-            mask_tgt = 1 - (tgt == 0)
+            # mask_src = 1 - (src == 0)
+            # mask_tgt = 1 - (tgt == 0)
+
+            mask_src = ~(src == self.PAD_ID)
+            mask_tgt = ~(tgt == self.PAD_ID)
 
             clss = torch.tensor(self._pad(pre_clss, -1))
             try:
@@ -68,28 +97,48 @@ class Batch(object):
                 # import pdb;pdb.set_trace()
 
             sent_labels = torch.tensor(self._pad(pre_sent_labels, 0))
+            section_rg = torch.tensor(section_rg)
+
+            # for int identifier
             sent_sect_labels = torch.tensor(self._pad(sent_sect_labels, 0))
-            mask_cls = 1 - (clss == -1)
+
+
+
+            # mask_cls = 1 - (clss == -1)
+            mask_cls = ~(clss == -1)
             clss[clss == -1] = 0
 
             setattr(self, 'clss', clss.to(device))
             setattr(self, 'mask_cls', mask_cls.to(device))
             setattr(self, 'src_sent_labels', src_sent_labels.to(device))
             setattr(self, 'sent_labels', sent_labels.to(device))
+            setattr(self, 'section_rg', section_rg.to(device))
 
             setattr(self, 'src', src.to(device))
             setattr(self, 'tgt', tgt.to(device))
             setattr(self, 'segs', segs.to(device))
             setattr(self, 'mask_src', mask_src.to(device))
             setattr(self, 'mask_tgt', mask_tgt.to(device))
+
+            # for int identifier
             setattr(self, 'sent_sect_labels', sent_sect_labels.to(device))
+
+            # just for debugging
+            src_str = [x[-1] for x in data]
+            setattr(self, 'src_str', src_str)
+            setattr(self, 'paper_id', paper_id)
 
             if (is_test):
                 setattr(self, 'paper_id', paper_id)
-                src_str = [x[-4] for x in data]
+                src_str = [x[6] for x in data]
                 setattr(self, 'src_str', src_str)
-                tgt_str = [x[-3] for x in data]
+                tgt_str = [x[-4] for x in data]
                 setattr(self, 'tgt_str', tgt_str)
+                setattr(self, 'section_rg', section_rg)
+
+                # sent_sect_labels = [x[-2] for x in data]
+                # setattr(self, 'sent_sect_labels', sent_sect_labels)
+
 
     def __len__(self):
         return self.batch_size
@@ -109,13 +158,24 @@ def load_dataset(args, corpus_type, shuffle):
     # assert corpus_type in ["train", "valid", "test"]
 
     def _lazy_dataset_loader(pt_file, corpus_type):
+        # dataset = torch.load(pt_file)[:20]
         dataset = torch.load(pt_file)
         logger.info('Loading %s dataset from %s, number of examples: %d' %
                     (corpus_type, pt_file, len(dataset)))
         return dataset
 
     # Sort the glob output by file name (by increasing indexes).
-    pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt'))
+    # if corpus_type == "val":
+    #     pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.3.*.pt'))
+    # else:
+    if corpus_type == 'val' or corpus_type=='test':
+        pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt'), reverse=True)
+        pts = [(int(f.split('.')[-2]), f) for f in pts]
+        pts = sorted(pts, key=lambda tup: tup[0], reverse=False)
+        pts = [p[1] for p in pts]
+    else:
+        pts = glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt')
+
     if pts:
         if (shuffle):
             random.shuffle(pts)
@@ -232,8 +292,10 @@ class DataIterator(object):
         clss = ex['clss']
         src_txt = ex['src_txt']
         tgt_txt = ex['tgt_txt']
-        if is_test:
-            paper_id = ex['paper_id']
+        paper_id = ex['paper_id']
+        section_rg = ex['segment_rg_score']
+        # if is_test:
+        #     paper_id = ex['paper_id']
         sent_sect_labels = ex['sent_sect_labels']
         if len(sent_sect_labels) != len(src_sent_labels):
             import pdb;
@@ -251,9 +313,9 @@ class DataIterator(object):
 
         # import pdb;pdb.set_trace()
         if (is_test):
-            return src, tgt, segs, clss, src_sent_labels, sent_labels, src_txt, tgt_txt, sent_sect_labels, paper_id
+            return src, tgt, segs, clss, src_sent_labels, sent_labels, src_txt, tgt_txt, sent_sect_labels, paper_id, section_rg
         else:
-            return src, tgt, segs, clss, src_sent_labels, sent_labels, sent_sect_labels
+            return src, tgt, segs, clss, src_sent_labels, sent_labels, sent_sect_labels, paper_id, src_txt
 
     def batch_buffer(self, data, batch_size):
         minibatch, size_so_far = [], 0
@@ -294,11 +356,15 @@ class DataIterator(object):
         data = self.data()
         for buffer in self.batch_buffer(data, self.batch_size * 300):
 
+
             if (self.args.task == 'abs'):
                 p_batch = sorted(buffer, key=lambda x: len(x[2]))
                 p_batch = sorted(p_batch, key=lambda x: len(x[1]))
             else:
-                p_batch = sorted(buffer, key=lambda x: len(x[2]))
+
+                # p_batch = sorted(buffer, key=lambda x: len(x[2]))
+                # p_batch = sorted(buffer, key=lambda x: x[-1])
+                p_batch = buffer
 
             p_batch = self.batch(p_batch, self.batch_size)
 

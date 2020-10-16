@@ -38,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('-id_files_src', default='')
 
     parser.add_argument('-n_cpus', default=2, type=int)
+    parser.add_argument('-sample', default=50000, type=int)
     parser.add_argument('-sample_ration', default=0.5, type=float)
 
     args = parser.parse_args()

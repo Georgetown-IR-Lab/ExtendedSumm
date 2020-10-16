@@ -359,7 +359,6 @@ class MultiHeadedAttention(nn.Module):
                 query, key, value = self.linear_query(query), \
                                     self.linear_keys(query), \
                                     self.linear_values(query)
-
                 key = shape(key)
                 value = shape(value)
 
@@ -386,6 +385,7 @@ class MultiHeadedAttention(nn.Module):
                     else:
                         key, value = layer_cache["memory_keys"], \
                                      layer_cache["memory_values"]
+
                     layer_cache["memory_keys"] = key
                     layer_cache["memory_values"] = value
                 else:
@@ -402,12 +402,14 @@ class MultiHeadedAttention(nn.Module):
 
         query = shape(query)
 
+
         key_len = key.size(2)
         query_len = query.size(2)
 
         # 2) Calculate and scale scores.
         query = query / math.sqrt(dim_per_head)
         scores = torch.matmul(query, key.transpose(2, 3))
+
 
         if mask is not None:
             mask = mask.unsqueeze(1).expand_as(scores)
@@ -428,12 +430,16 @@ class MultiHeadedAttention(nn.Module):
             attn = torch.cat([attn[:, :-1], attn_masked.unsqueeze(1)], 1)
 
         drop_attn = self.dropout(attn)
+        # drop_attn = attn
         if (self.use_final_linear):
+
             context = unshape(torch.matmul(drop_attn, value))
             output = self.final_linear(context)
+
             return output
         else:
             context = torch.matmul(drop_attn, value)
+
             return context
 
         # CHECK

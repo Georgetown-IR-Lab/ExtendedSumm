@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
 # Barolo
-BERT_DATA_PATH=/home/sajad/datasets/longsumm/bs-data-longsumm-oracle/
-MODEL_PATH=/disk1/sajad/sci-trained-models/presum/lsum-ext-abs-oracle-1000/
+#BERT_DATA_PATH=/home/sajad/datasets/longsumm/new-abs-set/bert-files/oracle
+#BERT_DATA_PATH=/home/sajad/datasets/longsumm/new-abs-set/splits/bert-files/oracle-rg/
+BERT_DATA_PATH=/home/sajad/datasets/longsumm/new-abs-set/splits/bert-files/oracle/
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/lsum-oracle-abs-v2/
 
 # Brunello
 #BERT_DATA_PATH=/disk1/sajad/datasets/sci/arxiv/bert-files/5l-oracle-1700/
@@ -22,14 +24,14 @@ python train.py  -task abs \
                 -test_batch_size 1000 \
                 -train_steps 200000 \
                 -report_every 50 \
-                -val_interval 1500 \
+                -val_interval 2500 \
                 -accum_count 2 \
                 -use_bert_emb true \
                 -use_interval true \
                 -warmup_steps_bert 20000 \
                 -warmup_steps_dec 10000 \
                 -max_pos 1700 \
-                -visible_gpus 0,1 \
+                -visible_gpus 1 \
                 -log_file ../logs/abs_bert_cnndm \
                 -load_from_extractive /disk1/sajad/sci-trained-models/presum/lsum-arxiv-first-phase/model_step_35000.pt
-#                -train_from /disk1/sajad/pretrained-bert/cnn-ext-abs/model_step_148000.pt
+#                -train_from /disk1/sajad/pretrained-bert/cnn-ext-abs/model_step_148000.pt43
