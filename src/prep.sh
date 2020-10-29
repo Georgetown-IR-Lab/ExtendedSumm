@@ -125,22 +125,22 @@ BERT_DIR=$BASE_DIR/bert-files/
 #BERT_DIR=$BASE_DIR/my-format-sample/bert-files/512-section-arxiv/
 
 # Longsumm
-#BASE_DIR=/home/sajad/datasets/longsumm/new-abs-set/splits/
-#RAW_PATH=$BASE_DIR/
-#SAVE_JSON=$BASE_DIR/jsons/main-sections/
-#BERT_DIR=$BASE_DIR/bert-files/512-section-task/
+#BASE_DIR=/disk1/sajad/datasets/sci/longsumm/new-abs-set/
+#RAW_PATH=$BASE_DIR/splits/
+#SAVE_JSON=$BASE_DIR/jsons/whole-raw-abs/
+#BERT_DIR=$BASE_DIR/bert-files/512-whole-sectioned-raw-abs/
 
 # PubMed-long
-#BASE_DIR=/disk1/sajad/datasets/sci/pubmed-dataset/
-#RAW_PATH=$BASE_DIR/my-format-splits-450/
-#SAVE_JSON=$BASE_DIR/jsons-450/plain/
-#BERT_DIR=$BASE_DIR/bert-files-450/512-longformertest/
+BASE_DIR=/disk1/sajad/datasets/sci/pubmed-dataset/
+RAW_PATH=$BASE_DIR/single_files/my-format/
+SAVE_JSON=$BASE_DIR/jsons-whole/
+BERT_DIR=$BASE_DIR/bert-files/512-whole-segmented/
 
 # arxiv-long
-BASE_DIR=/disk1/sajad/datasets/sci/arxiv-long/v1/
-RAW_PATH=$BASE_DIR/my-format-splits/
-SAVE_JSON=$BASE_DIR/jsons/plain-sectioned/
-BERT_DIR=$BASE_DIR/bert-files/512-sectioned-section-rg/
+#BASE_DIR=/disk1/sajad/datasets/sci/arxiv-long/v1/
+#RAW_PATH=$BASE_DIR/my-format-splits/
+#SAVE_JSON=$BASE_DIR/jsons/whole/
+#BERT_DIR=$BASE_DIR/bert-files/512-whole-sectioned-sectiontext-sectRg/
 
 # csabs
 #BASE_DIR=/disk1/sajad/datasets/sci/csabs/
@@ -148,33 +148,46 @@ BERT_DIR=$BASE_DIR/bert-files/512-sectioned-section-rg/
 #SAVE_JSON=$BASE_DIR/json/
 #BERT_DIR=$BASE_DIR/bert-files/5l-csabs/
 
-#BERT_DIR=bert-files/5l/
-#
-#RAW_PATH=/disk1/sajad/datasets/sci/csabs/
+# main-arxiv
+#BASE_DIR=//disk1/sajad/datasets/sci/arxiv-dataset/
+#RAW_PATH=$BASE_DIR/single_files/my-format/
+#SAVE_JSON=$BASE_DIR/jsons/whole/
+#BERT_DIR=$BASE_DIR/bert-files/512-whole-sectioned/
 
-#
-#for SET in test train val
-#do
-#    python3 preprocess.py -mode format_longsum_to_lines \
-#                        -save_path $SAVE_JSON  \
-#                        -n_cpus 5 \
-#                        -keep_sect_num \
-#                        -log_file ../logs/preprocess.log \
-#                        -raw_path $RAW_PATH \
-#                        -dataset $SET
-#done
 
-for SET in test train val
+
+echo "Starting to write aggregated json files..."
+echo "-----------------"
+
+
+for SET in train
 do
-    python3 preprocess.py -mode format_to_bert_longsumm \
+    python3 preprocess.py -mode format_longsum_to_lines \
+                        -save_path $SAVE_JSON  \
+                        -n_cpus 22 \
+                        -keep_sect_num \
+                        -shard_size 300 \
+                        -log_file ../logs/preprocess.log \
+                        -raw_path $RAW_PATH/$SET/ \
+                        -dataset $SET
+done
+
+echo "-----------------"
+echo "Now starting to write torch files..."
+echo "-----------------"
+
+for SET in train
+do
+    python3 preprocess.py -mode format_to_bert \
                         -bart \
                         -model_name scibert \
+                        -lower \
                         -dataset $SET \
                         -id_files_src $id_files_src \
                         -raw_path $SAVE_JSON/ \
                         -save_path $BERT_DIR/ \
-                        -n_cpus 10 \
+                        -n_cpus 24 \
                         -lower \
                         -log_file ../logs/preprocess.log
 done
-#
+##

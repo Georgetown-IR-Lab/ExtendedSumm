@@ -8,6 +8,7 @@ from torch.utils import checkpoint
 # from torch.autograd import Variable
 from transformers import BertModel, BertConfig, LongformerModel
 
+# from models.pointer_generator.PG_transformer import PointerGeneratorTransformer
 from models.decoder import TransformerDecoder
 from models.encoder import ExtTransformerEncoder
 from models.optimizers import Optimizer
@@ -107,19 +108,16 @@ def build_optim_dec(args, model, checkpoint):
 
 
 def get_generator(vocab_size, dec_hidden_size, device):
-    gen_func = nn.LogSoftmax(dim=-1)
-    generator = nn.Sequential(
-        nn.Linear(dec_hidden_size, vocab_size),
-        gen_func
-    )
+    gen_func = nn.LogSoftmax(dim=1)
+    generator = nn.Sequential(nn.Linear(dec_hidden_size, vocab_size), gen_func)
     generator.to(device)
-
     return generator
 
 
 class Bert(nn.Module):
     def __init__(self, large, model_name, temp_dir, finetune=False):
         super(Bert, self).__init__()
+
         if model_name == 'bert':
             if (large):
                 self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
@@ -130,8 +128,8 @@ class Bert(nn.Module):
                 # self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir, config=config)
                 # self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
 
-        elif model_name=='scibert':
-                self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
+        elif model_name == 'scibert':
+            self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
 
         elif model_name == 'longformer':
             if large:
@@ -153,8 +151,7 @@ class Bert(nn.Module):
                 global_mask = torch.zeros(mask_src.shape, dtype=torch.long, device='cuda').unsqueeze(0)
                 global_mask[:,:,clss.long()] = 1
                 global_mask = global_mask.squeeze(0)
-                top_vec, _ = self.model(x, attention_mask=mask_src.long(), global_attention_mask=global_mask.long())
-                # top_vec, _ = self.model(x, attention_mask=mask_src)
+                top_vec, _ = self.model(x, attention_mask=mask_src.long(), global_attention_mask=global_mask)
 
         else:
             self.eval()
@@ -165,24 +162,27 @@ class Bert(nn.Module):
 
 
 class ExtSummarizer(nn.Module):
-    def __init__(self, args, device, checkpoint, is_joint=True):
+    def __init__(self, args, device, checkpoint, is_joint=True, rg_predictor=False):
         super(ExtSummarizer, self).__init__()
         self.is_joint = is_joint
         self.sentence_encoder = SentenceEncoder(args, device, checkpoint)
         self.sentence_predictor = SentenceExtLayer()
-
+        self.rg_predictor = rg_predictor
+        # self.decoder = PointerGeneratorTransformer()
         if is_joint:
             self.uncertainty_loss = UncertaintyLoss()
+            self.section_predictor = SectionExtLayer()
 
-        if not is_joint:
-            self.bin_loss = torch.nn.BCELoss(reduction='none')
+        if not is_joint and not rg_predictor:
+            self.loss_sentence_picker = torch.nn.BCELoss(reduction='none')
+
+        if rg_predictor:
+            self.loss_sentence_picker = torch.nn.MSELoss(reduction='none')
+
 
         # for p in self.sentence_encoder.parameters():
         #     if p.dim() > 1:
         #         xavier_uniform_(p)
-
-        if is_joint:
-            self.section_predictor = SectionExtLayer()
 
         if checkpoint is not None:
             # if self.is_joint:
@@ -225,28 +225,46 @@ class ExtSummarizer(nn.Module):
 
 
 
-    def forward(self, src, segs, clss, mask_src, mask_cls, sent_bin_labels, sent_sect_labels, is_inference=False):
+    def forward(self, src, segs, clss, mask_src, mask_cls, sent_bin_labels, sent_sect_labels, is_inference=False, return_encodings=False):
 
         encoded = self.sentence_encoder(src, segs, clss, mask_src, mask_cls)
-        # import pdb;pdb.set_trace()
-
+        # output = self.decoder(encoded, tgt=torch.rand(size=(7,11,768)).cuda(), src=torch.rand(size=(7,20,768)).cuda())
 
         sent_score = self.sentence_predictor(encoded, mask_cls)
 
         if self.is_joint:
             sect_scores = self.section_predictor(encoded, mask_cls)
+
             loss, loss_sent, loss_sect = self.uncertainty_loss(sent_score, sent_bin_labels, sect_scores, sent_sect_labels, mask=mask_cls)
 
-            return sent_score * self.uncertainty_loss.alpha[0], sect_scores * self.uncertainty_loss.alpha[1], mask_cls, loss, loss_sent, loss_sect
+            # factor0 = torch.div(1.0, self.uncertainty_loss._sigmas_sq[0])
+            # factor1 = torch.div(1.0, self.uncertainty_loss._sigmas_sq[1])
+            # out0 = torch.mul(factor0, sent_score)
+            # out1 = torch.mul(factor1, sect_scores)
+            return sent_score, sect_scores, mask_cls, loss, loss_sent, loss_sect
 
         else:
+            if not self.rg_predictor:
+                loss = self.loss_sentence_picker(sent_score, sent_bin_labels.float())
+                loss = ((loss * mask_cls.float()).sum() / mask_cls.sum(dim=1)).sum()
+                if not is_inference:
+                    loss = loss / loss.numel()
 
-            loss = self.bin_loss(sent_score, sent_bin_labels.float())
-            loss = (loss * mask_cls.float()).sum()
-            if not is_inference:
-                loss = loss / loss.numel()
+            else:
+                loss = self.loss_sentence_picker(sent_score, sent_bin_labels.float())
+                loss = ((loss * mask_cls.float()).sum() / mask_cls.sum(dim=1)).sum()
+                if not is_inference:
+                    loss = loss / loss.numel()
+
+            # if is_inference:
+            #     return sent_score, mask_cls, loss, None, None, encoded
+
+            if return_encodings:
+                return sent_score, mask_cls, loss, None, None, encoded
 
             return sent_score, mask_cls, loss, None, None
+
+
 
 
 class SentenceEncoder(nn.Module):
@@ -358,21 +376,12 @@ class AbsSummarizer(nn.Module):
         super(AbsSummarizer, self).__init__()
         self.args = args
         self.device = device
-        self.bert = Bert(args.large, args.temp_dir, args.finetune_bert)
-
-        if (args.max_pos > 512):
-            my_pos_embeddings = nn.Embedding(args.max_pos, self.bert.model.config.hidden_size)
-            my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
-            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,
-                                                  :].repeat(args.max_pos - 512, 1)
-            self.bert.model.embeddings.position_embeddings = my_pos_embeddings
-
-
-
+        self.bert = Bert(args.large, args.model_name, args.temp_dir, args.finetune_bert)
+        self.sentence_encoder = SentenceEncoder(args, device, checkpoint)
 
         if bert_from_extractive is not None:
-            # self.bert.model.load_state_dict(dict([(n[11:], p) for n, p in bert_from_extractive.items() if n.startswith('sentence_encoder.bert.model')]), strict=True)
-            self.bert.model.load_state_dict(dict([(n[28:], p) for n, p in bert_from_extractive.items() if n.startswith('sentence_encoder.bert.model')]), strict=True)
+            self.bert.model.load_state_dict(
+                dict([(n[11:], p) for n, p in bert_from_extractive.items() if n.startswith('bert.model')]), strict=True)
 
         if (args.encoder == 'baseline'):
             bert_config = BertConfig(self.bert.model.config.vocab_size, hidden_size=args.enc_hidden_size,
@@ -382,7 +391,11 @@ class AbsSummarizer(nn.Module):
                                      attention_probs_dropout_prob=args.enc_dropout)
             self.bert.model = BertModel(bert_config)
 
-
+        if(args.max_pos>512):
+            my_pos_embeddings = nn.Embedding(args.max_pos, self.bert.model.config.hidden_size)
+            my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
+            my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,:].repeat(args.max_pos-512,1)
+            self.bert.model.embeddings.position_embeddings = my_pos_embeddings
         self.vocab_size = self.bert.model.config.vocab_size
         tgt_embeddings = nn.Embedding(self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0)
         if (self.args.share_emb):
@@ -396,12 +409,9 @@ class AbsSummarizer(nn.Module):
         self.generator = get_generator(self.vocab_size, self.args.dec_hidden_size, device)
         self.generator[0].weight = self.decoder.embeddings.weight
 
-        if checkpoint is not None:
-            # import pdb;pdb.set_trace()
-            self.load_state_dict(checkpoint['model'], strict=True)
-            # self.decoder.load_state_dict()
-            # self.decoder.load_state_dict(dict([(n[8:], p) for n, p in checkpoint['model'].items() if n.startswith('decoder.')]), strict=True)
 
+        if checkpoint is not None:
+            self.load_state_dict(checkpoint['model'], strict=True)
         else:
             for module in self.decoder.modules():
                 if isinstance(module, (nn.Linear, nn.Embedding)):
@@ -416,7 +426,7 @@ class AbsSummarizer(nn.Module):
                     xavier_uniform_(p)
                 else:
                     p.data.zero_()
-            if (args.use_bert_emb):
+            if(args.use_bert_emb):
                 tgt_embeddings = nn.Embedding(self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0)
                 tgt_embeddings.weight = copy.deepcopy(self.bert.model.embeddings.word_embeddings.weight)
                 self.decoder.embeddings = tgt_embeddings
@@ -424,52 +434,21 @@ class AbsSummarizer(nn.Module):
 
         self.to(device)
 
-    def custom(self, module, outs):
-        def custom_forward(*inputs):
-            """
-
-            :param inputs: 0: tgt, 1: top_vec, 2:src
-            :type inputs:
-            :return:
-            :rtype:
-            """
-            output = module(inputs[0][:, :-1], inputs[1], outs[0])
-            outs.append(output[1])
-            return output[0]
-
-        return custom_forward
-
-    def custom_bert(self, module):
-        def custom_forward(*inputs):
-            """
-
-            :param inputs: 0: tgt, 1: top_vec, 2:src
-            :type inputs:
-            :return:
-            :rtype:
-            """
-            output = module(*inputs)
-            return output
-
-        return custom_forward
-
     def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
+        top_vec = self.bert(src, segs, mask_src, mask_cls, clss)
 
-        # return decoder_outputs, None
-
-        # top_vec = self.bert(src, segs, mask_src)
-        #
-        top_vec = checkpoint.checkpoint(
-            self.custom_bert(self.bert), src.float().requires_grad_(), segs.float().requires_grad_(), mask_src.float().requires_grad_(),
-        )
+        # src = src[torch.arange(top_vec.size(0)).unsqueeze(1), clss.long()]
+        # src = src * mask_cls[:, :, None].float()
+        # encoded_sent = self.ext_transformer_layer(sents_vec, mask_cls)
 
         dec_state = self.decoder.init_decoder_state(src, top_vec)
-        # outs = []
-        # outs.append(dec_state)
+        tgt = torch.rand(size=(1, 9, 768))
+        decoder_outputs, attn_enc_dec, state = self.decoder(tgt[:, :-1], top_vec, clss, dec_state)
+        return decoder_outputs, attn_enc_dec, None
 
-        # decoder_outputs = checkpoint.checkpoint(
-        #     self.custom(self.decoder, outs), tgt.float().requires_grad_(), top_vec.float().requires_grad_(),
-        # )
-        # state = outs[1]
-        decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
-        return decoder_outputs, None
+
+
+
+
+
+

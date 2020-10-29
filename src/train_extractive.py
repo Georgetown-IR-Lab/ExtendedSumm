@@ -200,6 +200,7 @@ def test_ext(args, device_id, pt, step, is_joint=False):
     trainer = build_trainer(args, device_id, model, None)
     # trainer.test(test_iter, step)
     # trainer.test(test_iter_fct, step)
+    # trainer.validate_rouge_mmr(test_iter_fct, step)
     trainer.validate_rouge(test_iter_fct, step)
     # trainer.validate_cls(test_iter_fct, step)
 
@@ -250,7 +251,7 @@ def train_single_ext(args, device_id, is_joint=False):
         return data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False), args.test_batch_size, device,
                                       shuffle=False, is_test=True)
 
-    model = ExtSummarizer(args, device, checkpoint, is_joint)
+    model = ExtSummarizer(args, device, checkpoint, is_joint, args.rg_predictor)
     optim = model_builder.build_optim(args, model, checkpoint)
 
     logger.info(model)

@@ -53,14 +53,14 @@ if __name__ == '__main__':
     parser.add_argument("-model_name", default='bert-base')
 
     parser.add_argument("-shard_size", default=2000, type=int)
-    parser.add_argument('-min_src_nsents', default=3, type=int)
+    parser.add_argument('-min_src_nsents', default=1, type=int)
     parser.add_argument('-max_src_nsents', default=600, type=int)
     parser.add_argument('-min_src_ntokens_per_sent', default=5, type=int)
-    parser.add_argument('-max_src_ntokens_per_sent', default=120, type=int)
+    parser.add_argument('-max_src_ntokens_per_sent', default=150, type=int)
     parser.add_argument('-min_tgt_ntokens', default=20, type=int)
     parser.add_argument('-max_tgt_ntokens', default=1800, type=int)
 
-    parser.add_argument("-lower", type=str2bool, nargs='?',const=True,default=True)
+    parser.add_argument("-lower", type=str2bool, nargs='?',const=True,default=False)
     parser.add_argument("-bart", type=str2bool, nargs='?',const=True,default=False)
     parser.add_argument("-keep_sect_num", type=str2bool, nargs='?',const=True,default=False)
     parser.add_argument("-use_bert_basic_tokenizer", type=str2bool, nargs='?',const=True,default=False)

@@ -320,6 +320,7 @@ class MultiHeadedAttention(nn.Module):
            * one of the attention vectors `[batch, query_len, key_len]`
         """
 
+
         # CHECKS
         # batch, k_len, d = key.size()
         # batch_, k_len_, d_ = value.size()
@@ -409,8 +410,6 @@ class MultiHeadedAttention(nn.Module):
         # 2) Calculate and scale scores.
         query = query / math.sqrt(dim_per_head)
         scores = torch.matmul(query, key.transpose(2, 3))
-
-
         if mask is not None:
             mask = mask.unsqueeze(1).expand_as(scores)
             # test = torch.tensor([[[[-1e12]]]]).expand_as(scores).cuda().to(dtype=torch.float64)
@@ -430,13 +429,18 @@ class MultiHeadedAttention(nn.Module):
             attn = torch.cat([attn[:, :-1], attn_masked.unsqueeze(1)], 1)
 
         drop_attn = self.dropout(attn)
+        drop_attn_out = drop_attn.sum(dim=1) / self.head_count
+
         # drop_attn = attn
         if (self.use_final_linear):
 
             context = unshape(torch.matmul(drop_attn, value))
             output = self.final_linear(context)
+            if type=='context':
+                return output, drop_attn_out
+            else:
+                return output
 
-            return output
         else:
             context = torch.matmul(drop_attn, value)
 
