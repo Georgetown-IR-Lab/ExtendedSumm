@@ -126,7 +126,15 @@ class LossComputeBase(nn.Module):
         batch_stats = Statistics()
         shard_state = self._make_shard_state(batch, output)
         for shard in shards(shard_state, shard_size):
+            # out = torch.rand(size=(1, 999, 768))
+            # out[:, :992, :] = shard['output'].repeat(1, 999 // 8, 1)
+            #
+            # out[:, 992:, :] = shard['output'][:, :7, :]
+            # shard['output'] = out
+            import pdb;pdb.set_trace()
+
             loss, stats = self._compute_loss(batch, **shard)
+
             # with amp.scale_loss(loss, optim.optimizer) as scaled_loss:
             loss.div(float(normalization)).backward()
 
@@ -210,11 +218,14 @@ class NMTLossCompute(LossComputeBase):
     def _make_shard_state(self, batch, output):
         return {
             "output": output,
-            "target": batch.tgt[:,1:],
+            "target": batch.sent_labels,
         }
 
     def _compute_loss(self, batch, output, target):
         bottled_output = self._bottle(output)
+
+        import pdb;pdb.set_trace()
+
         scores = self.generator(bottled_output)
         gtruth =target.contiguous().view(-1)
 

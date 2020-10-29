@@ -184,7 +184,7 @@ class Statistics(object):
     """
 
     def __init__(self, loss=0, loss_sent=0, loss_sect=0, n_docs=0, n_acc=0, RMSE=0, accuracy=0, F1sect={},
-                 n_correct=0, r1=0, r2=0, rl=0, stat_file_dir=None, print_traj=False):
+                 n_correct=0, r1=0, r2=0, rl=0, stat_file_dir=None, print_traj=False, a1=0.1, a2=0.1):
         self.loss = loss
         self.loss_sect = loss_sect
         self.loss_sent = loss_sent
@@ -196,6 +196,10 @@ class Statistics(object):
         self.rl = rl
         self.RMSE = RMSE
         self.accuracy = accuracy
+
+
+        self.a1 = a1
+        self.a2 = a2
         # self.F1sect = F1sect.copy()
         # self.n_f1_sep = F1sect.copy()
         #
@@ -280,6 +284,8 @@ class Statistics(object):
         self.accuracy += stat.accuracy
         self.n_docs += stat.n_docs
         self.n_acc += stat.n_acc
+        self.a1 = stat.a1
+        self.a2 = stat.a2
 
         # section-wise
         # self.F1sect += stat.F1sect
@@ -367,7 +373,7 @@ class Statistics(object):
             # foveral, f11, f12, f13, f14, f15 = self.self_get_f1_sect()
             logger.info(
                 (
-                    "Step %s; mse_sent: %4.2f (%4.2f/%d) + xent_sect: %4.2f = mlt: %4.2f (RMSE-sent: %4.4f, ACC: %4.4f) "
+                    "Step %s; mse_sent: %4.2f (%4.2f/%d) + xent_sect: %4.2f = mlt: %4.2f (%4.4f, %4.4f) (RMSE-sent: %4.4f, ACC: %4.4f) "
                     # "F1-sect: %4.2f ([0] %4.2f, "
                     # "[1] %4.2f, [2] %4.2f, [3] %4.2f, [4] %4.2f)); " +
                     "lr: %7.7f; %3.0f docs/s; %6.0f sec")
@@ -377,6 +383,8 @@ class Statistics(object):
                    self.n_docs,
                    self.xent_sect(),
                    self.total_loss(),
+                   self.a1,
+                   self.a2,
                    self._get_rmse_sent(),
                    self._get_acc_sect(),
                    learning_rate,
@@ -399,6 +407,9 @@ class Statistics(object):
     def log_tensorboard(self, prefix, writer, learning_rate, alpha_1, alpha2, step, report_rl=False):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
+
+        # self.a1 = alpha_1
+        # self.a2 = alpha2
         writer.add_scalar(prefix + "/total_loss", self.total_loss(), step)
         writer.add_scalar(prefix + "/RMSE", self._get_rmse_sent(), step)
         # writer.add_scalar(prefix + "/F1_sect", self._get_f1_sect()[0], step)
@@ -406,6 +417,8 @@ class Statistics(object):
         writer.add_scalar(prefix + "/xent_sect", self.xent_sect(), step)
         writer.add_scalar(prefix + "/ACC", self._get_acc_sect(), step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
+
+
         writer.add_scalar(prefix + "/Sentence-Weight", alpha_1, step)
         writer.add_scalar(prefix + "/Section-Weight", alpha2, step)
         writer.add_scalar(prefix + "/Optimizer", alpha2, step)
@@ -414,7 +427,7 @@ class Statistics(object):
             writer.add_scalar(prefix + "/Rouge-2", self.r2, step)
             writer.add_scalar(prefix + "/Rouge-l", self.rl, step)
 
-            writer.add_scalar(prefix + "/Precision", self.p, step)
+            # writer.add_scalar(prefix + "/Precision", self.p, step)
 
 
             # writer.add_scalars(prefix + "/Section-wise-acc", {

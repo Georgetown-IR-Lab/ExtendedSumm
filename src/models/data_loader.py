@@ -71,7 +71,7 @@ class Batch(object):
                     # labelize_str_convert(sent_sect_labels)
                     labelize(sent_sect_labels)
                     paper_id = [x[9] for x in data]
-                    section_rg = [x[10] for x in data]
+                    # section_rg = [x[10] for x in data]
 
             src = torch.tensor(self._pad(pre_src, 0))
             tgt = torch.tensor(self._pad(pre_tgt, 0))
@@ -97,7 +97,7 @@ class Batch(object):
                 # import pdb;pdb.set_trace()
 
             sent_labels = torch.tensor(self._pad(pre_sent_labels, 0))
-            section_rg = torch.tensor(section_rg)
+            # section_rg = torch.tensor(section_rg)
 
             # for int identifier
             sent_sect_labels = torch.tensor(self._pad(sent_sect_labels, 0))
@@ -112,7 +112,7 @@ class Batch(object):
             setattr(self, 'mask_cls', mask_cls.to(device))
             setattr(self, 'src_sent_labels', src_sent_labels.to(device))
             setattr(self, 'sent_labels', sent_labels.to(device))
-            setattr(self, 'section_rg', section_rg.to(device))
+            # setattr(self, 'section_rg', section_rg.to(device))
 
             setattr(self, 'src', src.to(device))
             setattr(self, 'tgt', tgt.to(device))
@@ -132,9 +132,13 @@ class Batch(object):
                 setattr(self, 'paper_id', paper_id)
                 src_str = [x[6] for x in data]
                 setattr(self, 'src_str', src_str)
-                tgt_str = [x[-4] for x in data]
+                tgt_str = [x[7] for x in data]
                 setattr(self, 'tgt_str', tgt_str)
-                setattr(self, 'section_rg', section_rg)
+                # sent_sections_txt = [x[11] for x in data]
+                # sent_sect_wise_rg = [x[11] for x in data]
+
+                # setattr(self, 'sent_sections_txt', sent_sections_txt)
+                # setattr(self, 'sent_sect_wise_rg', sent_sect_wise_rg)
 
                 # sent_sect_labels = [x[-2] for x in data]
                 # setattr(self, 'sent_sect_labels', sent_sect_labels)
@@ -158,7 +162,9 @@ def load_dataset(args, corpus_type, shuffle):
     # assert corpus_type in ["train", "valid", "test"]
 
     def _lazy_dataset_loader(pt_file, corpus_type):
-        # dataset = torch.load(pt_file)[:20]
+        # if corpus_type == 'val':
+        #     dataset = torch.load(pt_file)[:20]
+        # else:
         dataset = torch.load(pt_file)
         logger.info('Loading %s dataset from %s, number of examples: %d' %
                     (corpus_type, pt_file, len(dataset)))
@@ -170,11 +176,14 @@ def load_dataset(args, corpus_type, shuffle):
     # else:
     if corpus_type == 'val' or corpus_type=='test':
         pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt'), reverse=True)
-        pts = [(int(f.split('.')[-2]), f) for f in pts]
+        pts = [(int(f.split('.')[-3]), f) for f in pts]
         pts = sorted(pts, key=lambda tup: tup[0], reverse=False)
         pts = [p[1] for p in pts]
-    else:
-        pts = glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt')
+    elif corpus_type=='train':
+        pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt'), reverse=True)
+        import random
+        random.seed(888)
+        random.shuffle(pts)
 
     if pts:
         if (shuffle):
@@ -293,7 +302,12 @@ class DataIterator(object):
         src_txt = ex['src_txt']
         tgt_txt = ex['tgt_txt']
         paper_id = ex['paper_id']
-        section_rg = ex['segment_rg_score']
+        # sent_sections_txt = ex['sent_sections_txt']
+        # sent_sect_wise_rg = ex['sent_sect_wise_rg']
+        if 'segment_rg_score' not in ex.keys():
+            section_rg = [0 for _ in range(len(clss))]
+        else:
+            section_rg = ex['segment_rg_score']
         # if is_test:
         #     paper_id = ex['paper_id']
         sent_sect_labels = ex['sent_sect_labels']
@@ -309,6 +323,7 @@ class DataIterator(object):
         sent_labels = sent_labels[:max_sent_id]
         clss = clss[:max_sent_id]
         src_txt = src_txt[:max_sent_id]
+        # sent_sections_txt = sent_sections_txt[:max_sent_id]
         sent_sect_labels = sent_sect_labels[:max_sent_id]
 
         # import pdb;pdb.set_trace()
