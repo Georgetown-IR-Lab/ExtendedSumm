@@ -7,7 +7,7 @@ mkdir -p ../results/$(echo $MODEL_PATH | cut -d \/ -f 6)
 RESULT_PATH_TEST=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/
 MAX_POS=512
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0,1
 
 python train.py -task ext \
                 -mode train \
