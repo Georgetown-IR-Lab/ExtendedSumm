@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-DATA_PATH=/disk1/sajad/datasets/sci/pubmed-dataset//bert-files/512-whole-relabled-7/
+DATA_PATH=/disk1/sajad/datasets/sci/pubmed-dataset//bert-files/512-whole/
 MODEL_PATH=/disk1/sajad/sci-trained-models/presum/pubmed-512-whole-sectioned-baseline-classi/
 LOG_DIR=../logs/$(echo $MODEL_PATH | cut -d \/ -f 6).log
 mkdir -p ../results/$(echo $MODEL_PATH | cut -d \/ -f 6)
@@ -16,7 +16,8 @@ python train.py -task ext \
                 -ext_dropout 0.1 \
                 -model_path $MODEL_PATH \
                 -lr 2e-3 \
-                -visible_gpus 0 \
+                -visible_gpus 0,1 \
+                -val_pred_len 7 \
                 -report_every 50 \
                 -log_file $LOG_DIR \
                 -val_interval 3000 \
