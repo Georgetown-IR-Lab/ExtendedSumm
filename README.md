@@ -46,7 +46,6 @@ mkdir -p ../results/$(echo $MODEL_PATH | cut -d \/ -f 6)
 RESULT_PATH_TEST=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/
 MAX_POS=512
 
-
 python train.py -task ext \
                 -mode train \
                 -model_name scibert \
@@ -54,7 +53,8 @@ python train.py -task ext \
                 -ext_dropout 0.1 \
                 -model_path $MODEL_PATH \
                 -lr 2e-3 \
-                -visible_gpus 0.1 \
+                -visible_gpus $CUDA_VISIBLE_DEVICES \
+                -val_pred_len 7 \
                 -report_every 50 \
                 -log_file $LOG_DIR \
                 -val_interval 3000 \
