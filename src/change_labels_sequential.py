@@ -144,7 +144,6 @@ for j, f in tqdm(enumerate(glob.glob(PT_DIRS + se + '*.pt')), total=len(glob.glo
         sentences = instance['src_txt']
         slables = instance['sent_labels']
         old_labels = instance['sent_sect_labels']
-        import pdb;pdb.set_trace()
         position_in_dict = ds_instance_labels_ids.index(paper_id)
 
         new_labels = []
@@ -160,7 +159,8 @@ for j, f in tqdm(enumerate(glob.glob(PT_DIRS + se + '*.pt')), total=len(glob.glo
 
         # new_labels_modified = replace_most_frequent(new_labels, paper_id)
         new_instances[-1]['sent_sect_labels'] = new_labels
-    destination = f.replace('512-seqAllen-whole-sectioned-labels', '512-seqAllen-whole-sectioned-labels-sectionlabels')
+    # destination = f.replace('512-segmented-sectioned-scibert-15', '512-segmented-sectioned-scibert-15-chunked')
+    destination = '/'.join(f.split('/')[:-1]) + '-chuncked/' + f.split('/')[-1]
     check_path_existense('/'.join(destination.split('/')[:-1]))
     # torch.save(new_instances, destination)
     prev_inst_counter += len(instances)
