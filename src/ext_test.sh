@@ -26,7 +26,7 @@ export CUDA_VISIBLE_DEVICES=0,1
 MAX_POS=2500
 
 mkdir -p ../results/$(echo $MODEL_PATH | cut -d \/ -f 6)
-for ST in val
+for ST in test
 do
     RESULT_PATH=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/$ST
 #    RESULT_PATH=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/abs-set/$ST.official
@@ -54,26 +54,4 @@ do
                     -saved_list_name save_lists/lsum-$ST-longformer-multi50-aftersdu.p \
                     -section_prediction \
                     -alpha_mtl 0.50
-
 done
-
-#for ST in test
-#do
-#    PRED_LEN=20
-#    METHOD=_base
-#    SAVED_LIST=save_lists/pubmedL-$ST-scibert-bertsum.p
-#    C1=.8
-#    C2=0
-#    C3=0.2
-#    python3 pick_mmr.py -co1 $C1 \
-#                            -co2 $C2 \
-#                            -co3 $C3 \
-#                            -set $ST \
-#                            -method $METHOD \
-#                            -pred_len $PRED_LEN \
-#                            -saved_list $SAVED_LIST \
-#                            -end
-#done
-#
-
-
