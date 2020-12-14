@@ -42,6 +42,10 @@ This will uncompress the tar file into the current directory. The directory will
     * Index [3]: textual representation of the sentences.
     * Index [4]: oracle label associated with the sentence (0, or 1). 
 
+- "id": the paper ID
+- "abstract": the abstract text of the paper. This field is different from "gold" field for the datasets that have different ground-truth than the abstract. 
+
+
 ## Training 
 Now the is the time to train the extractive model. The training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
 
@@ -114,8 +118,6 @@ mkdir -p ../results/$(echo $MODEL_PATH | cut -d \/ -f 6)
 for ST in test
 do
     RESULT_PATH=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/$ST
-#    RESULT_PATH=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/abs-set/$ST.official
-#    RESULT_PATH=/home/sajad/datasets/longsum/submission_files/
     python3 train.py -task ext \
                     -mode test \
                     -test_batch_size 3000 \
