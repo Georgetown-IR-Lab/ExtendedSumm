@@ -123,10 +123,6 @@ class Bert(nn.Module):
                 self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
             else:
                 self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
-                # config = BertConfig.from_pretrained('allenai/scibert_scivocab_uncased')
-                # config.gradient_checkpointing = True
-                # self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir, config=config)
-                # self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
 
         elif model_name == 'scibert':
             self.model = BertModel.from_pretrained('allenai/scibert_scivocab_uncased', cache_dir=temp_dir)
@@ -176,7 +172,6 @@ class ExtSummarizer(nn.Module):
         self.sentence_encoder = SentenceEncoder(args, device, checkpoint)
         self.sentence_predictor = SentenceExtLayer()
         self.rg_predictor = rg_predictor
-        # self.decoder = PointerGeneratorTransformer()
         if is_joint:
             self.uncertainty_loss = UncertaintyLoss()
             self.section_predictor = SectionExtLayer()
@@ -191,36 +186,9 @@ class ExtSummarizer(nn.Module):
             self.loss_sentence_picker = torch.nn.MSELoss(reduction='none')
 
         self.args = args
-        # for p in self.sentence_encoder.parameters():
-        #     if p.dim() > 1:
-        #         xavier_uniform_(p)
 
         if checkpoint is not None:
-            # if self.is_joint:
-            #     for p in self.section_predictor.parameters():
-            #         if p.dim() > 1:
-            #             xavier_uniform_(p)
-            #
-            # pretrained_dict = {k: v for k, v in checkpoint['model'].items() if k in self.state_dict()}
-            # pretrained_dict['section_predictor.wo_2.weight'] = self.state_dict()['section_predictor.wo_2.weight']
-            # pretrained_dict['section_predictor.wo_2.bias'] = self.state_dict()['section_predictor.wo_2.bias']
-            # self.load_state_dict(pretrained_dict, strict=True)
-            #
             self.load_state_dict(checkpoint['model'], strict=True)
-            # list = []
-            # for key, val in checkpoint['model'].items():
-            #     if key.startswith('bert.model'):
-            #         list.append(('sentence_encoder.' + key, val))
-            #     elif key.startswith('ext_layer'):
-            #         list.append(('sentence_encoder.' + key.replace('ext_layer','ext_transformer_layer'), val))
-            #     # elif key.startswith('sentence_encoder.ext_transformer_layer.wo'):
-            #     #     list.append((key.replace('sentence_encoder.ext_transformer_layer','sentence_predictor'), val))
-            # for j, (key, val) in enumerate(list):
-            #     if key.startswith('sentence_encoder.ext_transformer_layer.wo'):
-            #         list[j] = (key.replace('sentence_encoder.ext_transformer_layer','sentence_predictor'), val)
-            #
-            # # import pdb;pdb.set_trace()
-            # self.load_state_dict(dict(list), strict=True)
         else:
             for p in self.sentence_predictor.parameters():
                 if p.dim() > 1:
@@ -239,8 +207,6 @@ class ExtSummarizer(nn.Module):
     def forward(self, src, segs, clss, mask_src, mask_cls, sent_bin_labels, sent_sect_labels, is_inference=False, return_encodings=False):
 
         encoded = self.sentence_encoder(src, segs, clss, mask_src, mask_cls)
-        # output = self.decoder(encoded, tgt=torch.rand(size=(7,11,768)).cuda(), src=torch.rand(size=(7,20,768)).cuda())
-
         sent_score = self.sentence_predictor(encoded, mask_cls)
 
         if self.is_joint:
@@ -262,10 +228,6 @@ class ExtSummarizer(nn.Module):
             else:
                 loss, loss_sent, loss_sect = self.uncertainty_loss(sent_score, sent_bin_labels, sect_scores, sent_sect_labels, mask=mask_cls)
 
-            # factor0 = torch.div(1.0, self.uncertainty_loss._sigmas_sq[0])
-            # factor1 = torch.div(1.0, self.uncertainty_loss._sigmas_sq[1])
-            # out0 = torch.mul(factor0, sent_score)
-            # out1 = torch.mul(factor1, sect_scores)
             return sent_score, sect_scores, mask_cls, loss, loss_sent, loss_sect
 
         else:
@@ -283,9 +245,6 @@ class ExtSummarizer(nn.Module):
                 loss = ((loss * mask_cls.float()).sum() / mask_cls.sum(dim=1)).sum()
                 if not is_inference:
                     loss = loss / loss.numel()
-
-            # if is_inference:
-            #     return sent_score, mask_cls, loss, None, None, encoded
 
             if return_encodings:
                 return sent_score, mask_cls, loss, None, None, encoded
@@ -323,33 +282,12 @@ class SentenceEncoder(nn.Module):
 
 
         self.sigmoid = nn.Sigmoid()
-        # if checkpoint is not None:
-        #     import pdb;pdb.set_trace()
-        #     self.load_state_dict(checkpoint['model'], strict=True)
-
-        # else:
-        #     if args.param_init != 0.0:
-        #         for p in self.ext_transformer_layer.parameters():
-        #             p.data.uniform_(-args.param_init, args.param_init)
-        #     if args.param_init_glorot:
-        #         for p in self.ext_transformer_layer.parameters():
-        #             if p.dim() > 1:
-        #                 xavier_uniform_(p)
-
-        # self.to(device)
 
     def forward(self, src, segs, clss, mask_src, mask_cls):
-        # self.eval()
-
         top_vec = self.bert(src, segs, mask_src, mask_cls, clss)
-        # top_vec = checkpoint.checkpoint(
-        #     self.custom_sent_decider(self.bert),
-        #     src, segs, mask_src
-        # )
         sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss.long()]
         sents_vec = sents_vec * mask_cls[:, :, None].float()
         encoded_sent = self.ext_transformer_layer(sents_vec, mask_cls)
-        # import pdb;pdb.set_trace()
         return encoded_sent
 
 
@@ -358,27 +296,9 @@ class SentenceExtLayer(nn.Module):
         super(SentenceExtLayer, self).__init__()
         self.wo = nn.Linear(768, 1, bias=True)
         self.sigmoid = nn.Sigmoid()
-        #
-        # self.seq_model = nn.Sequential(
-        #     nn.Linear(768, 1, bias=True),
-        #     nn.Sigmoid()
-        # )
-
-    # def custom_sent_decider(self, module):
-    #     def custom_forward(*inputs):
-    #         output = module(inputs[0], inputs[1])
-    #         return output
-    #
-    #     return custom_forward
 
     def forward(self, x, mask):
-        # sent_scores = self.seq_model(x)
-        # import pdb;pdb.set_trace()
         sent_scores = self.sigmoid(self.wo(x))
-
-        # modules = [module for k, module in self.seq_model._modules.items()]
-        # input_var = torch.autograd.Variable(x, requires_grad=True)
-        # sent_scores = checkpoint_sequential(modules, 2, input_var)
         sent_scores = sent_scores.squeeze(-1) * mask.float()
 
         return sent_scores
@@ -388,12 +308,8 @@ class SectionExtLayer(nn.Module):
     def __init__(self):
         super(SectionExtLayer, self).__init__()
         self.wo_2 = nn.Linear(768, 5, bias=True)
-        #
-        # self.dropout = nn.Dropout(0.5)
-        # self.leakyReLu = nn.LeakyReLU()
 
     def forward(self, x, mask):
-        # sent_sect_scores = self.dropout(self.wo_2(x))
         sent_sect_scores = self.wo_2(x)
         sent_sect_scores = sent_sect_scores.squeeze(-1) * mask.unsqueeze(2).expand_as(sent_sect_scores).float()
 
