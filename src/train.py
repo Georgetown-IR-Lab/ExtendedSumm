@@ -56,7 +56,7 @@ if __name__ == '__main__':
     parser.add_argument("-share_emb", type=str2bool, nargs='?', const=True, default=False)
     parser.add_argument("-finetune_bert", type=str2bool, nargs='?', const=True, default=True)
     parser.add_argument("-dec_dropout", default=0.2, type=float)
-    parser.add_argument("-alpha_mtl", default=0.4, type=float)
+    parser.add_argument("-alpha_mtl", default=-1, type=float)
 
     parser.add_argument("-dec_layers", default=6, type=int)
     # parser.add_argument("-dec_layers", default=4, type=int)
@@ -113,6 +113,7 @@ if __name__ == '__main__':
 
 
     parser.add_argument('-visible_gpus', default='-1', type=str)
+    parser.add_argument('-saved_list_name', default='-1', type=str)
     parser.add_argument('-gpu_ranks', default='0', type=str)
     parser.add_argument('-log_file', default='../logs/cnndm.log')
     parser.add_argument('-seed', default=666, type=int)
@@ -126,6 +127,7 @@ if __name__ == '__main__':
     parser.add_argument("-fold_base_dir", default='')
     parser.add_argument("-report_rouge", type=str2bool, nargs='?',const=True,default=True)
     parser.add_argument("-block_trigram", type=str2bool, nargs='?', const=True, default=True)
+    parser.add_argument("-pick_top", type=str2bool, nargs='?', const=True, default=False)
 
     parser.add_argument("-section_prediction", action='store_true')
     parser.add_argument("-rg_predictor", action='store_true')

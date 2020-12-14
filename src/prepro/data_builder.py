@@ -4,7 +4,9 @@ import hashlib
 import json
 import os
 import os.path
+import pickle
 import re
+import sys
 from os.path import join as pjoin
 
 import pandas as pd
@@ -16,7 +18,9 @@ from others.logging import logger
 from others.tokenization import BertTokenizer, LongformerTokenizerMine
 from prepro.utils import _get_word_ngrams
 from utils.rouge_score import evaluate_rouge
-
+from datetime import datetime
+from uuid import uuid4
+import pdb
 nyt_remove_words = ["photo", "graph", "chart", "map", "table", "drawing"]
 
 
@@ -30,9 +34,10 @@ def hashhex(s):
 # Tokenization classes
 
 class LongformerData():
-    def __init__(self, args):
-        self.args = args
-        self.CHUNK_LIMIT = 512
+    def __init__(self, args=None):
+        if args is not None:
+            self.args = args
+        self.CHUNK_LIMIT = 2500
 
         self.tokenizer = LongformerTokenizerMine.from_pretrained('longformer-based-uncased', do_lower_case=True)
 
@@ -49,8 +54,7 @@ class LongformerData():
 
     def cal_token_len(self, src):
         idxs = [i for i, s in enumerate(src) if (len(s[0]) > self.args.min_src_ntokens_per_sent)]
-
-        src = [src[0][i][:self.args.max_src_ntokens_per_sent] for i in idxs]
+        src = [src[i][:self.args.max_src_ntokens_per_sent] for i in idxs]
         src = src[:self.args.max_src_nsents]
         src_txt = [' '.join(sent[0]) for sent in src]
         text = ' {} {} '.format(self.sep_token, self.cls_token).join(src_txt)
@@ -59,7 +63,17 @@ class LongformerData():
 
         return len(src_subtokens)
 
-    def make_chunks(self, src_sents_tokens, tgt, sent_labels=None, sent_sections=None, sent_rg_scores=None, chunk_size=3000,
+    def cal_token_len_prep(self, src):
+        # idxs = [i for i, s in enumerate(src)]
+        # src = [src[i] for i in idxs]
+        src_txt = [sent[0] for sent in src]
+        text = ' {} {} '.format(self.sep_token, self.cls_token).join(src_txt)
+        src_subtokens = self.tokenizer.tokenize(text)
+        src_subtokens = [self.cls_token] + src_subtokens + [self.sep_token]
+
+        return len(src_subtokens)
+
+    def make_chunks(self, src_sents_tokens, tgt, sent_labels=None, section_heading_txt=None, sent_rg_scores=None, chunk_size=2500,
                     paper_idx=0):
 
         idxs = [i for i, s in enumerate(src_sents_tokens) if (len(s[0]) > self.args.min_src_ntokens_per_sent)]
@@ -72,42 +86,51 @@ class LongformerData():
         src_sents_tokens = [src_sents_tokens[i][:self.args.max_src_ntokens_per_sent] for i in idxs]
 
         sent_labels = [_sent_labels[i] for i in idxs]
-        sent_sections = [sent_sections[i] for i in idxs]
+        section_heading_txt = [section_heading_txt[i] for i in idxs]
         sent_rg_scores = [sent_rg_scores[i] for i in idxs]
 
         src_sents_tokens = src_sents_tokens[:self.args.max_src_nsents]
         sent_labels = sent_labels[:self.args.max_src_nsents]
         sent_rg_scores = sent_rg_scores[:self.args.max_src_nsents]
 
-        sent_sections = sent_sections[:self.args.max_src_nsents]
+        section_heading_txt = section_heading_txt[:self.args.max_src_nsents]
 
         # calculate section importance
-        section_rouge= {}
-        cursect = src_sents_tokens[0][1]
+        section_rouge = {}
+        section_text = ''
+        # section_heading_txt = [s[1] for s in src_sents_tokens]
+
         for idx, sent in enumerate(src_sents_tokens):
             sect_txt = sent[1]
-            section_text = ''
 
-            if idx == len(src_sents_tokens) - 1:
-                rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
-                section_rouge[cursect] = rg_score
+            if idx == 0:
+                cursect = sect_txt
+                section_text += ' '.join(sent[0])
+                section_text += ' '
 
             if sect_txt == cursect:
                 section_text += ' '.join(sent[0])
                 section_text += ' '
 
-            else:
-                rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
+            else:  # sect has changed...
+
+                # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
+                rg_score = 0
                 section_rouge[cursect] = rg_score
                 cursect = sent[1]
                 section_text = ''
                 section_text += ' '.join(sent[0])
 
-        import pdb;pdb.set_trace()
+        # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
+        # section_rouge[cursect] = rg_score
+        section_rouge[cursect] = 0
 
+        # if "illustrative @xmath39 matrix example of a @xmath1-symmetric hamiltonian" in section_heading_txt:
+        #     print('here')
+        #     import pdb;pdb.set_trace()
 
         src_txt = [' '.join(sent[0]) for sent in src_sents_tokens]
-        src_txt_sections = [s[1] for s in src_sents_tokens]
+        # section_heading_txt = [s for s in section_heading_txt]
         text = ' {} {} '.format(self.sep_token, self.cls_token).join(src_txt)
 
         src_subtokens = self.tokenizer.tokenize(text)
@@ -117,25 +140,43 @@ class LongformerData():
 
         cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
         sent_labels = sent_labels[:len(cls_ids)]
-        sent_sections = sent_sections[:len(cls_ids)]
+        section_heading_txt = section_heading_txt[:len(cls_ids)]
         sent_rg_scores = sent_rg_scores[:len(cls_ids)]
 
         out_sents_labels = []
-        out_sents_sections = []
+        out_section_heading_txt = []
         out_sents_rg_scores = []
         out_sect_sentwise_rg = []
         cur_len = 0
         out_src = []
-        # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [' '.join([' '.join(s) for s in src])])[2]
-        rg_score =0
+        rg_score = 0
         j = 0
         last_chunk = False
         while j < len(cls_ids):
+            if j == len(cls_ids) - 1:
+                out_src1 = out_src.copy()
+                out_sect_sentwise_rg1 = out_sect_sentwise_rg.copy()
+                out_sents_labels1 = out_sents_labels.copy()
+                out_section_heading_txt1 = out_section_heading_txt.copy()
+                out_sents_rg_scores1 = out_sents_rg_scores.copy()
+                out_src.clear()
+                out_sect_sentwise_rg.clear()
+                out_sents_labels.clear()
+                out_section_heading_txt.clear()
+                out_sents_rg_scores.clear()
+                cur_len1 = cur_len
+                cur_len = 0
+                last_chunk = True
+                if len(out_src1) == 0:
+                    j += 1
+                    continue
+                yield out_src1, out_sents_labels1, out_section_heading_txt1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
+
             if cur_len < chunk_size:
-                out_src.append((src_sents_tokens[j][0], src_sents_tokens[j][1]))
+                out_src.append((src_sents_tokens[j][0], src_sents_tokens[j][1], src_sents_tokens[j][2]))
                 out_sect_sentwise_rg.append(section_rouge[src_sents_tokens[j][1]])
                 out_sents_labels.append(sent_labels[j])
-                out_sents_sections.append(sent_sections[j])
+                out_section_heading_txt.append(section_heading_txt[j])
                 out_sents_rg_scores.append(sent_rg_scores[j])
                 if j != 0:
                     cur_len += len(src_subtokens[cls_ids[j - 1]:cls_ids[j]])
@@ -148,16 +189,16 @@ class LongformerData():
                 out_src = out_src[:-1]
                 out_sect_sentwise_rg = out_sect_sentwise_rg[:-1]
                 out_sents_labels = out_sents_labels[:-1]
-                out_sents_sections = out_sents_sections[:-1]
+                out_section_heading_txt = out_section_heading_txt[:-1]
                 out_sents_rg_scores = out_sents_rg_scores[:-1]
                 out_src1 = out_src.copy()
                 out_sect_sentwise_rg1 = out_sect_sentwise_rg.copy()
                 out_sents_labels1 = out_sents_labels.copy()
-                out_sents_sections1 = out_sents_sections.copy()
+                out_section_heading_txt1 = out_section_heading_txt.copy()
                 out_sents_rg_scores1 = out_sents_rg_scores.copy()
                 out_src.clear()
                 out_sents_labels.clear()
-                out_sents_sections.clear()
+                out_section_heading_txt.clear()
                 out_sents_rg_scores.clear()
                 cur_len1 = cur_len
                 cur_len = 0
@@ -165,34 +206,18 @@ class LongformerData():
                 if len(out_src1) == 0:
                     j += 1
                     continue
-                yield out_src1, out_sents_labels1, out_sents_sections1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
 
-            if j == len(cls_ids) - 1:
-                out_src1 = out_src.copy()
-                out_sect_sentwise_rg1 = out_sect_sentwise_rg.copy()
-                out_sents_labels1 = out_sents_labels.copy()
-                out_sents_sections1 = out_sents_sections.copy()
-                out_sents_rg_scores1 = out_sents_rg_scores.copy()
-                out_src.clear()
-                out_sect_sentwise_rg.clear()
-                out_sents_labels.clear()
-                out_sents_sections.clear()
-                out_sents_rg_scores.clear()
-                cur_len1 = cur_len
-                cur_len = 0
-                last_chunk = True
-                if len(out_src1) == 0:
-                    j += 1
-                    continue
-                yield out_src1, out_sents_labels1, out_sents_sections1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
+                yield out_src1, out_sents_labels1, out_section_heading_txt1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
 
     def preprocess_single(self, src, tgt, sent_rg_scores=None, sent_labels=None, sent_sections=None,
-                          use_bert_basic_tokenizer=False, section_rgs = None, is_test=False, debug=False):
+                          use_bert_basic_tokenizer=False, is_test=False, section_rgs=None, debug=False):
+
 
         if ((not is_test) and len(src) == 0):
             return None
+
         original_src_txt = [' '.join(s[0]) for s in src]
-        idxs = [i for i, s in enumerate(src) if (len(s) > self.args.min_src_ntokens_per_sent)]
+        idxs = [i for i, s in enumerate(src) if (len(s[0]) > self.args.min_src_ntokens_per_sent)]
 
         _sent_labels = [0] * len(src)
         for l in sent_labels:
@@ -221,7 +246,16 @@ class LongformerData():
         if ((not is_test) and len(src) < self.args.min_src_nsents):
             return None
 
-        src_txt = [' '.join(sent) for sent in src]
+        src_txt = [' '.join(sent[0]) for sent in src]
+        src_sent_token_count = [self.cal_token_len([(sent[0], 'test')]) for sent in src]
+
+        src_sents_sections = [sent[1] for sent in src]
+        src_sents_number = [sent[2] for sent in src]
+
+        try:
+            sents_sect_wise_rg = [section_rgs[sect] for sect in src_sents_sections]
+        except:
+            import pdb;pdb.set_trace()
         text = ' {} {} '.format(self.sep_token, self.cls_token).join(src_txt)
 
         src_subtokens = self.tokenizer.tokenize(text)
@@ -259,21 +293,17 @@ class LongformerData():
         # if debug:
         #     import pdb;pdb.set_trace()
 
-        return src_subtoken_idxs, sent_rg_scores, sent_labels, sent_sections, tgt_subtoken_idxs, segments_ids, cls_indxes, src_txt, tgt_txt
-
+        return src_subtoken_idxs, sent_rg_scores, sent_labels, sent_sections, tgt_subtoken_idxs, segments_ids, cls_indxes, src_txt, tgt_txt, sents_sect_wise_rg, src_sents_number, src_sent_token_count
 
 class BertData():
     def __init__(self, args):
         self.CHUNK_LIMIT = 512
         self.args = args
-        # self.tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased',
-        #                                                do_lower_case=True)
-        #
 
         if args.model_name == 'scibert':
             self.tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True)
 
-        elif 'bert-base' in args.model_name:
+        elif 'bert-base' in args.model_name or 'bert-large' in args.model_name:
             self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
 
         self.sep_token = '[SEP]'
@@ -283,18 +313,11 @@ class BertData():
         self.tgt_eos = '[unused1]'
         self.tgt_sent_split = '[unused2]'
 
-        # self.sep_token = '</s>'
-        # self.cls_token = '<s>'
-        # self.pad_token = '<pad>'
-        # self.tgt_bos = 'madeupword0000'
-        # self.tgt_eos = 'madeupword0001'
-        # self.tgt_sent_split = 'madeupword0002'
-
         self.sep_vid = self.tokenizer.vocab[self.sep_token]
         self.cls_vid = self.tokenizer.vocab[self.cls_token]
         self.pad_vid = self.tokenizer.vocab[self.pad_token]
 
-    def make_chunks(self, src_sents_tokens, tgt, sent_labels=None, sent_sections=None, sent_rg_scores=None, chunk_size=512,
+    def make_chunks(self, src_sents_tokens, tgt, sent_labels=None, section_heading_txt=None, sent_rg_scores=None, chunk_size=512,
                     paper_idx=0):
 
         idxs = [i for i, s in enumerate(src_sents_tokens) if (len(s[0]) > self.args.min_src_ntokens_per_sent)]
@@ -307,25 +330,24 @@ class BertData():
         src_sents_tokens = [src_sents_tokens[i][:self.args.max_src_ntokens_per_sent] for i in idxs]
 
         sent_labels = [_sent_labels[i] for i in idxs]
-        sent_sections = [sent_sections[i] for i in idxs]
+        section_heading_txt = [section_heading_txt[i] for i in idxs]
         sent_rg_scores = [sent_rg_scores[i] for i in idxs]
 
         src_sents_tokens = src_sents_tokens[:self.args.max_src_nsents]
         sent_labels = sent_labels[:self.args.max_src_nsents]
         sent_rg_scores = sent_rg_scores[:self.args.max_src_nsents]
 
-        sent_sections = sent_sections[:self.args.max_src_nsents]
+        section_heading_txt = section_heading_txt[:self.args.max_src_nsents]
 
         # calculate section importance
         section_rouge = {}
         section_text = ''
-        sectionss = [s[1] for s in src_sents_tokens]
-
+        # section_heading_txt = [s[1] for s in src_sents_tokens]
 
         for idx, sent in enumerate(src_sents_tokens):
             sect_txt = sent[1]
 
-            if idx==0:
+            if idx == 0:
                 cursect = sect_txt
                 section_text += ' '.join(sent[0])
                 section_text += ' '
@@ -334,24 +356,25 @@ class BertData():
                 section_text += ' '.join(sent[0])
                 section_text += ' '
 
-            else: # sect has changed...
+            else:  # sect has changed...
 
-                rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
+                # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
+                rg_score = 0
                 section_rouge[cursect] = rg_score
                 cursect = sent[1]
                 section_text = ''
                 section_text += ' '.join(sent[0])
 
-        rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
-        section_rouge[cursect] = rg_score
+        # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [section_text.strip()])[2]
+        # section_rouge[cursect] = rg_score
+        section_rouge[cursect] = 0
 
-        # if "illustrative @xmath39 matrix example of a @xmath1-symmetric hamiltonian" in sectionss:
+        # if "illustrative @xmath39 matrix example of a @xmath1-symmetric hamiltonian" in section_heading_txt:
         #     print('here')
         #     import pdb;pdb.set_trace()
 
-
-        src_txt = [' '.join(sent[0]) for sent in src_sents_tokens]
-        src_txt_sections = [s[1] for s in src_sents_tokens]
+        src_txt = [' '.join(sent[0]).replace('[CLS]', '[ CLS ]').replace('[SEP]', '[ SEP ]') for sent in src_sents_tokens]
+        # section_heading_txt = [s for s in section_heading_txt]
         text = ' {} {} '.format(self.sep_token, self.cls_token).join(src_txt)
 
         src_subtokens = self.tokenizer.tokenize(text)
@@ -361,16 +384,15 @@ class BertData():
 
         cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
         sent_labels = sent_labels[:len(cls_ids)]
-        sent_sections = sent_sections[:len(cls_ids)]
+        section_heading_txt = section_heading_txt[:len(cls_ids)]
         sent_rg_scores = sent_rg_scores[:len(cls_ids)]
 
         out_sents_labels = []
-        out_sents_sections = []
+        out_section_heading_txt = []
         out_sents_rg_scores = []
         out_sect_sentwise_rg = []
         cur_len = 0
         out_src = []
-        # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [' '.join([' '.join(s) for s in src])])[2]
         rg_score = 0
         j = 0
         last_chunk = False
@@ -379,12 +401,12 @@ class BertData():
                 out_src1 = out_src.copy()
                 out_sect_sentwise_rg1 = out_sect_sentwise_rg.copy()
                 out_sents_labels1 = out_sents_labels.copy()
-                out_sents_sections1 = out_sents_sections.copy()
+                out_section_heading_txt1 = out_section_heading_txt.copy()
                 out_sents_rg_scores1 = out_sents_rg_scores.copy()
                 out_src.clear()
                 out_sect_sentwise_rg.clear()
                 out_sents_labels.clear()
-                out_sents_sections.clear()
+                out_section_heading_txt.clear()
                 out_sents_rg_scores.clear()
                 cur_len1 = cur_len
                 cur_len = 0
@@ -392,13 +414,17 @@ class BertData():
                 if len(out_src1) == 0:
                     j += 1
                     continue
-                yield out_src1, out_sents_labels1, out_sents_sections1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
-
+                yield out_src1, out_sents_labels1, out_section_heading_txt1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
             if cur_len < chunk_size:
-                out_src.append((src_sents_tokens[j][0], src_sents_tokens[j][1]))
+                try:
+                    out_src.append((src_sents_tokens[j][0], src_sents_tokens[j][1], src_sents_tokens[j][2]))
+                    # print('1')
+                except:
+                    print('2')
+                    # import pdb;pdb.set_trace()
                 out_sect_sentwise_rg.append(section_rouge[src_sents_tokens[j][1]])
                 out_sents_labels.append(sent_labels[j])
-                out_sents_sections.append(sent_sections[j])
+                out_section_heading_txt.append(section_heading_txt[j])
                 out_sents_rg_scores.append(sent_rg_scores[j])
                 if j != 0:
                     cur_len += len(src_subtokens[cls_ids[j - 1]:cls_ids[j]])
@@ -411,16 +437,16 @@ class BertData():
                 out_src = out_src[:-1]
                 out_sect_sentwise_rg = out_sect_sentwise_rg[:-1]
                 out_sents_labels = out_sents_labels[:-1]
-                out_sents_sections = out_sents_sections[:-1]
+                out_section_heading_txt = out_section_heading_txt[:-1]
                 out_sents_rg_scores = out_sents_rg_scores[:-1]
                 out_src1 = out_src.copy()
                 out_sect_sentwise_rg1 = out_sect_sentwise_rg.copy()
                 out_sents_labels1 = out_sents_labels.copy()
-                out_sents_sections1 = out_sents_sections.copy()
+                out_section_heading_txt1 = out_section_heading_txt.copy()
                 out_sents_rg_scores1 = out_sents_rg_scores.copy()
                 out_src.clear()
                 out_sents_labels.clear()
-                out_sents_sections.clear()
+                out_section_heading_txt.clear()
                 out_sents_rg_scores.clear()
                 cur_len1 = cur_len
                 cur_len = 0
@@ -429,7 +455,7 @@ class BertData():
                     j += 1
                     continue
 
-                yield out_src1, out_sents_labels1, out_sents_sections1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
+                yield out_src1, out_sents_labels1, out_section_heading_txt1, out_sents_rg_scores1, cur_len1, last_chunk, rg_score, section_rouge
 
 
 
@@ -471,7 +497,10 @@ class BertData():
             return None
 
         src_txt = [' '.join(sent[0]) for sent in src]
+        src_sent_token_count = [self.cal_token_len([(sent[0], 'test')]) for sent in src]
+
         src_sents_sections = [sent[1] for sent in src]
+        src_sents_number = [sent[2] for sent in src]
 
         try:
             sents_sect_wise_rg = [section_rgs[sect] for sect in src_sents_sections]
@@ -514,7 +543,7 @@ class BertData():
         # if debug:
         #     import pdb;pdb.set_trace()
 
-        return src_subtoken_idxs, sent_rg_scores, sent_labels, sent_sections, tgt_subtoken_idxs, segments_ids, cls_indxes, src_txt, tgt_txt, sents_sect_wise_rg
+        return src_subtoken_idxs, sent_rg_scores, sent_labels, sent_sections, tgt_subtoken_idxs, segments_ids, cls_indxes, src_txt, tgt_txt, sents_sect_wise_rg, src_sents_number, src_sent_token_count
 
     def cal_token_len(self, src):
 
@@ -531,7 +560,7 @@ class BertData():
 
 # bert-function
 def format_to_bert(args):
-    test_kws = pd.read_csv('train_papers_sects.csv')
+    test_kws = pd.read_csv('csv_files/train_papers_sect8.csv')
 
     kws = {
         'intro': [kw.strip() for kw in test_kws['intro'].dropna()],
@@ -546,8 +575,11 @@ def format_to_bert(args):
     else:
         datasets = ['test']
 
-    # labels = pickle.load(open(args.id_files_src + '/sentence_labels/' + str(datasets[0]) + '_labels_csp.p', "rb"))
-    labels = []
+
+    if len(args.sent_numbers_file) > 0:
+        sent_numbers = pickle.load(open(args.sent_numbers_file, "rb"))
+    else:
+        sent_numbers = None
 
     # ARXIVIZATION
     bart = args.bart
@@ -556,12 +588,11 @@ def format_to_bert(args):
         a_lst = []
         c = 0
         for json_f in glob.glob(pjoin(args.raw_path, corpus_type + '.*.json')):
-        # for json_f in ['/disk1/sajad/datasets/sci/pubmed-dataset//jsons-whole/test.22.json']:
             real_name = json_f.split('/')[-1]
             c += 1
             a_lst.append(
                 (corpus_type, json_f, args, pjoin(args.save_path, real_name.replace('json', 'bert.pt')), kws, bart,
-                 labels, 1))
+                 sent_numbers, 1))
         print("Number of files: " + str(c))
 
         ##########################
@@ -572,12 +603,10 @@ def format_to_bert(args):
         #     _format_to_bert(a)
 
 
-
-
         # single
-        # json_f = args.raw_path + '/val.4.json'
+        # json_f = args.raw_path + '/train.6.json'
         # _format_to_bert(('val', str(json_f), args, pjoin(args.save_path, str(json_f).replace('json', 'bert.pt')), kws, bart,
-        #          labels, 156))
+        #          sent_numbers, 25))
 
         ##########################
         ###### <DEBUGGING> #######
@@ -587,80 +616,63 @@ def format_to_bert(args):
         print('Processing {} set with {} json files...'.format(corpus_type, len(a_lst)))
         all_papers_count = 0
         all_paper_ids = {}
-        for d in tqdm(pool.imap(_format_to_bert, a_lst), total=len(a_lst)):
+        for d in tqdm(pool.imap(_format_to_bert, a_lst), total=len(a_lst), desc=''):
             all_paper_ids[d[0]] = d[1]
             all_papers_count += d[2]
 
-        #
         pool.close()
         pool.join()
 
-        print('There are {} papers processed alltogether...'.format(all_papers_count))
-        print('--------------------------')
-        # not_idx = []
-        # all_paper_filenames = os.listdir(os.path.join("/disk1/sajad/datasets/sci/pubmed-dataset/single_files/my-format/", corpus_type))
-        # paperss = 0
-        # for key, val in all_paper_ids.items():
-        #     paperss += len(val)
-        #     for v in val:
-        #         if v + '.json' in all_paper_filenames:
-        #             # not_idx.append((key, v))
-        #             all_paper_filenames.remove(v + '.json')
-        #
-        # if len(all_paper_filenames) > 0:
-        #
-        #     print('Could not index {} papers: '.format(len(all_paper_filenames)))
-        #
-        #     print('\n'.join(['{}. paper_id: {}'.format('?', k) for k in all_paper_filenames]))
-
-
-    # data = []
-    # with open(args.raw_path + '/' + str(datasets[0]) + '.0.json') as f:
-    #     for li in f:
-    #         data.append(json.loads(li.strip()))
-
-    # pt = []
-    # ptctr = 0
-    # part = 0
-    #
-    # bart = args.bart
-    #
-    # check_path_existence(args.save_path)
-    #
-    # for i, d in enumerate(data):
-    #     pt.append(d)
-    #     ptctr += 1
-    #     if ptctr > 500:
-    #         _fomat_to_bert_section_based_to_text(
-    #             (
-    #             datasets[0], pt, args, args.save_path + '/' + datasets[0] + '.' + str(part) + '.pt', kws, bart))
-    #         part += 1
-    #         ptctr = 0
-    #         pt.clear()
-    # if len(pt) > 0:
-    #     _fomat_to_bert_section_based_to_text((datasets[0], pt, args,
-    #                                   args.save_path + '/' + datasets[0] + '.' + str(part) + '.pt', kws, bart))
-
 
 def _format_to_bert(params):
-    corpus_type, json_file, args, save_file, kws, bart, labels, debug_idx = params
+    corpus_type, json_file, args, save_file, kws, bart, sent_numbers_whole, debug_idx = params
     papers_ids = set()
 
     # if os.path.exists(save_file):
     #     return
 
-    def remove_ack(source):
+    def get_sect_id(sect):
+
+        def check_existense(kws, sect):
+            for kw in kws:
+                if len(kw.split()) < len(sect.split()):
+                    if kw in sect:
+                        return True
+                else:
+                    if sect in kw:
+                        return True
+            return False
+
+        if sect.lower() in 'abstract' or 'abstract' in sect.lower() or sect.lower() in kws['conclusion'] or check_existense(kws['conclusion'], sect.lower()):
+            return 3
+        elif sect.lower() in kws['intro'] or check_existense(kws['intro'], sect.lower()):
+            return 0
+        elif sect.lower() in kws['exp'] or check_existense(kws['exp'], sect.lower()):
+            return 2
+        elif sect.lower() in kws['res'] or check_existense(kws['res'], sect.lower()):
+            return 2
+        # elif sect.lower() in kws['conclusion'] or check_existense(kws['conclusion'], sect.lower()):
+        #     return 5
+        else:
+            return 1
+
+    def remove_ack(source, debug=False):
         out = []
+        sect_idx = 2
+        if debug:
+            import pdb;pdb.set_trace()
+
         for sent in source:
-            if 'acknowledgment' in sent[1].lower() or 'acknowledgments' in sent[1].lower() or 'acknowledgements' in  sent[1].lower() \
-                    or 'fund' in sent[1].lower() or 'funding' in sent[1].lower() \
-                    or 'appendices' in sent[1].lower() or 'proof of' in sent[1].lower() or \
-                    'related work' in sent[1].lower() or 'previous works' in sent[1].lower() or 'references' in sent[1].lower() \
-                    or 'figure captions' in sent[1].lower() or 'acknowledgement' in sent[1].lower() or 'appendix' in sent[1].lower() :
+            if 'acknowledgment' in sent[sect_idx].lower().split() or 'acknowledgments' in sent[sect_idx].lower().split() or 'acknowledgements' in sent[sect_idx].lower().split() \
+                    or 'fund' in sent[sect_idx].lower().split() or 'funding' in sent[sect_idx].lower().split() \
+                    or 'appendices' in sent[sect_idx].lower().split() or 'proof of' in sent[sect_idx].lower() or \
+                    'related work' in sent[sect_idx].lower() or 'previous works' in sent[sect_idx].lower() or 'references' in sent[sect_idx].lower().split() \
+                    or 'figure captions' in sent[sect_idx].lower() or 'acknowledgement' in sent[sect_idx].lower().split() or 'appendix' in sent[sect_idx].lower().split():
                 continue
 
             else:
                 out.append(sent)
+
         return out
 
 
@@ -671,113 +683,159 @@ def _format_to_bert(params):
 
     model_name = args.model_name
     CHUNK_SIZE_CONST=-1
-    if model_name == 'bert-based' or model_name == 'scibert':
+    if model_name == 'bert-based' or model_name == 'scibert' or model_name == 'bert-large':
         bert = BertData(args)
         CHUNK_SIZE_CONST = 512
     elif model_name == 'longformer':
         bert = LongformerData(args)
-        CHUNK_SIZE_CONST = 3000
+        CHUNK_SIZE_CONST = 2500
 
     logger.info('Processing %s' % json_file)
     jobs = json.load(open(json_file))
     datasets = []
-    for j, data in tqdm(enumerate(jobs[debug_idx-1:]), total=len(jobs[debug_idx-1:])):
+
+    # for j, data in tqdm(enumerate(jobs[debug_idx-1:]), total=len(jobs[debug_idx-1:])):
+    for j, data in enumerate(jobs[debug_idx-1:]):
         try:
-            paper_id, source, tgt = data['id'], data['src'], data['tgt']
-            source = [s[1:] for s in source]
-            # source = remove_ack(source)
+            paper_id, data_src, data_tgt = data['id'], data['src'], data['tgt']
+            # data_src = [s[1:] for s in data_src]
+
+            if len(data_src) < 2:
+               continue
+
+            if not isinstance(data_src[0][0], int):
+                data_src = [[idx] + s for idx, s in enumerate(data_src)]
+
+            data_src = remove_ack(data_src)
+            if 'pubmed' in json_file:
+                data_tgt = [d[0] for d in data_tgt]
+
+
 
         except:
-            paper_id, source, tgt = data[0]['id'], data[0]['src'], data[0]['tgt']
-            source = [s[1:] for s in source]
-            # source = remove_ack(source)
+            with open('np_parsing.txt', mode='a') as F:
+                F.write(save_file + ' idx: ' + str(j) + '\n')
 
-        if len(source) <= 10:
+            paper_id, data_src, data_tgt = data[0]['id'], data[0]['src'], data[0]['tgt']
+            # data_src = [s[1:] for s in data_src]
+            data_src = remove_ack(data_src)
+
+        if len(data_src) < 5:
             continue
 
-        source_sents = [(s[0], s[1]) for s in source]
-        source_sents = [s[0] for s in source_sents if
-                        len(s) > args.min_src_ntokens_per_sent and len(s) < args.max_src_ntokens_per_sent]
-        source = [s for s in source if
-                  len(s[0]) > args.min_src_ntokens_per_sent and len(s[0]) < args.max_src_ntokens_per_sent]
+        if sent_numbers_whole is not None:
+            data_src = [d for d in data_src if d[0] in sent_numbers_whole[paper_id]]
+
+        source_sents = [(s[1], s[2]) for s in data_src]
+        source_sents = [s[0] for s in source_sents if len(s[0]) > args.min_src_ntokens_per_sent and len(s[0]) < args.max_src_ntokens_per_sent]
+
+        if len(source_sents) == 0:
+            continue
+
+        data_src = [s for s in data_src if len(s[1]) > args.min_src_ntokens_per_sent and len(s[1]) < args.max_src_ntokens_per_sent]
         # sent_labels = greedy_selection(source_sents, tgt, 10)
-        sent_labels = [i for i, s in enumerate(source) if
-                       s[-1] == 1 and len(s[0]) > args.min_src_ntokens_per_sent and len(
-                           s[0]) < args.max_src_ntokens_per_sent]
-        sent_rg_scores = [s[2] for i, s in enumerate(source) if
-                          len(s[0]) > args.min_src_ntokens_per_sent and len(s[0]) < args.max_src_ntokens_per_sent]
+        sent_labels = [i for i, s in enumerate(data_src) if
+                       s[-1] == 1 and len(s[1]) > args.min_src_ntokens_per_sent and len(
+                           s[1]) < args.max_src_ntokens_per_sent]
+        sent_rg_scores = [s[3] for i, s in enumerate(data_src) if len(s[1]) > args.min_src_ntokens_per_sent and len(s[1]) < args.max_src_ntokens_per_sent]
+
 
         if (args.lower):
-            source_sents = [(' '.join(s[0]).lower().split(), s[1]) for s in source]
-            # tgt = [' '.join(s[0]).lower().split() for s in tgt] #pubmed
+            source_sents = [([tkn.lower() for tkn in s[1]], s[2], s[0]) for s in data_src]
+            # tgt = [' '.join(s[0]).lower().split() for s in tgt] #pubmed-long
             # import pdb;pdb.set_trace()
-            tgt = [' '.join(s).lower().split() for s in tgt]  # arxiv
-            # tgt = tgt.lower()
 
-        sent_sections = [s[1] for s in source]
+            data_tgt = [[tkn.lower() for tkn in s] for s in data_tgt]  # arxiv ––non-pubmed
+        else:
+            source_sents = [(s[1], s[2], s[0]) for s in data_src]
+
+        sent_numbers = [s[0] for s in data_src]
+
+        sent_sections = [s[2] for s in data_src]
         # print(j)
         if True:
             tkn_len = bert.cal_token_len(source_sents)
+            # import pdb;pdb.set_trace()
             debug = False
 
 
             if tkn_len > CHUNK_SIZE_CONST:
-                for chunk_num, chunk in enumerate(
-                        bert.make_chunks(source_sents, tgt, sent_labels=sent_labels, sent_sections=sent_sections,
-                                         sent_rg_scores=sent_rg_scores, chunk_size=CHUNK_SIZE_CONST)):
-                    src_chunk, sent_labels_chunk, sent_sections_chunk, sent_rg_scores_chunk, curlen, is_last_chunk, rg_score, section_rgs = chunk
-                    src_label_paralel = zip(src_chunk, sent_labels_chunk)
-                    sent_labels_chunk = [i for i, s in enumerate(src_label_paralel) if s[1] == 1]
+                try:
+                    for chunk_num, chunk in enumerate(
+                            bert.make_chunks(source_sents, data_tgt, sent_labels=sent_labels, section_heading_txt=sent_sections,
+                                             sent_rg_scores=sent_rg_scores, chunk_size=CHUNK_SIZE_CONST)):
+                        src_chunk, sent_labels_chunk, sent_sections_chunk, sent_rg_scores_chunk, curlen, is_last_chunk, rg_score, section_rgs = chunk
+                        src_label_paralel = zip(src_chunk, sent_labels_chunk)
+                        sent_labels_chunk = [i for i, s in enumerate(src_label_paralel) if s[1] == 1]
+                        b_data = bert.preprocess_single(src_chunk, data_tgt, sent_labels=[0],
+                                                        sent_rg_scores=sent_rg_scores_chunk,
+                                                        use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
+                                                        is_test=is_test, sent_sections=sent_sections_chunk, section_rgs=section_rgs, debug=debug)
 
-                    b_data = bert.preprocess_single(src_chunk, tgt, sent_labels=sent_labels_chunk,
-                                                    sent_rg_scores=sent_rg_scores_chunk,
-                                                    use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
-                                                    is_test=is_test, sent_sections=sent_sections_chunk, section_rgs=section_rgs, debug=debug)
 
-                    if (b_data is None):
-                        continue
+                        if (b_data is None):
+                            # import pdb;pdb.set_trace()
+                            with open('not_parsed_chunk_multi_processing.txt', mode='a') as F:
+                                F.write(save_file + ' idx: ' + str(j) + ' paper_id: ' + str(paper_id) + '-' +str(chunk_num)+ '\n')
+                            # print(paper_id)
+                            continue
 
-                    src_subtoken_idxs, sent_rg_scores, sent_labels_chunk, sent_sections_chunk, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt, sents_sect_wise_rg = b_data
+                        src_subtoken_idxs, sent_rg_scores, sent_labels_chunk, sent_sections_chunk, tgt_subtoken_idxs, \
+                        segments_ids, cls_ids, src_txt, tgt_txt, sents_sect_wise_rg, src_sent_number, src_sent_token_count = b_data
 
-                    # sent_sections_chunk = [0 for _ in range(len(sent_sections_chunk))]
-                    try:
-                        # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [' '.join(src_txt)])[2] / 100
-                        b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
-                                       "src_sent_labels": sent_rg_scores.copy() if sent_rg_scores is not None else sent_sections_chunk,
-                                       "sent_labels": sent_labels_chunk.copy(),
-                                       "segs": segments_ids, 'clss': cls_ids,
-                                       'src_txt': src_txt, "tgt_txt": tgt_txt,
-                                       "paper_id": paper_id + '___' + str(chunk_num),
-                                       "sent_sect_labels": [0 for _ in range(len(sent_sections_chunk))], "segment_rg_score": rg_score,
-                                       "sent_sections_txt": sent_sections_chunk,  "sent_sect_wise_rg": sents_sect_wise_rg}
-                        papers_ids.add(paper_id)
-                        datasets.append(b_data_dict)
-                    except:
-                        # import pdb;pdb.set_trace()
-                        with open('not_parsed_chunk.txt', mode='a') as F:
-                            F.write(save_file + ' idx: ' + str(j) + '\n')
-                        continue
+                        # sent_sections_chunk = [0 for _ in range(len(sent_sections_chunk))]
+                        try:
+                            # rg_score = evaluate_rouge([tgt_txt.replace('<q>', ' ')], [' '.join(src_txt)])[2] / 100
+                            b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
+                                           "src_sent_labels": sent_rg_scores.copy() if sent_rg_scores is not None else sent_sections_chunk,
+                                           "sent_labels": sent_labels_chunk.copy(),
+                                           "segs": segments_ids, 'clss': cls_ids,
+                                           'src_txt': src_txt, "tgt_txt": tgt_txt,
+                                           "paper_id": paper_id + '___' + str(chunk_num) + '___' + datetime.now().strftime('%Y%m-%d%H-%M%S-') + str(uuid4()),
+                                           "sent_sect_labels": [get_sect_id(sect) for sect in sent_sections_chunk], "segment_rg_score": rg_score,
+                                           "sent_sections_txt": sent_sections_chunk,  "sent_sect_wise_rg": sents_sect_wise_rg, "sent_numbers":src_sent_number,
+                                           "sent_token_count":src_sent_token_count}
+                            # import pdb;
+                            # pdb.set_trace()
+
+                            papers_ids.add(paper_id.split('___')[0])
+                            datasets.append(b_data_dict)
+                        except:
+                            # import pdb;pdb.set_trace()
+                            with open('not_parsed_chunk_multi.txt', mode='a') as F:
+                                F.write(save_file + ' idx: ' + str(j) + ' paper_id: ' + str(paper_id) + '-' +str(chunk_num)+ '\n')
+                            # print('{} with {} sentences'.format(paper_id, len(src_chunk)))
+
+                            continue
+                except Exception:
+                    with open('not_parsed_chunks_function.txt', mode='a') as F:
+                        F.write(
+                            save_file + ' idx: ' + str(j) + ' paper_id: ' + str(paper_id) + '-' + '\n')
 
             else:
                 # non-sectionized or less than chunk size
+
                 try:
 
                     for chunk_num, chunk in enumerate(
-                            bert.make_chunks(source_sents, tgt, sent_labels=sent_labels, sent_sections=sent_sections,
+                            bert.make_chunks(source_sents, data_tgt, sent_labels=sent_labels, section_heading_txt=sent_sections,
                                              sent_rg_scores=sent_rg_scores, chunk_size=CHUNK_SIZE_CONST)):
 
                         src_chunk, sent_labels_chunk, sent_sections_chunk, sent_rg_scores_chunk, curlen, is_last_chunk, rg_score, section_rgs = chunk
 
-
-                        b_data = bert.preprocess_single(src_chunk, tgt, sent_labels=sent_labels_chunk,
+                        b_data = bert.preprocess_single(src_chunk, data_tgt, sent_labels=[0],
                                                         sent_rg_scores=sent_rg_scores_chunk,
                                                         use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
                                                         is_test=is_test, sent_sections=sent_sections_chunk, section_rgs=section_rgs, debug=debug)
 
                         if b_data == None:
+                            with open('not_parsed_processing.txt', mode='a') as F:
+                                F.write(save_file + ' idx: ' + str(j) + ' paper_id: ' + str(paper_id) + '\n')
+                            print(paper_id)
                             continue
 
-                        src_subtoken_idxs, sent_rg_scores, sent_labels, sent_sections, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt, sents_sect_wise_rg = b_data
+                        src_subtoken_idxs, sent_rg_scores, sent_labels_chunk, sent_sections_chunk, tgt_subtoken_idxs, \
+                        segments_ids, cls_ids, src_txt, tgt_txt, sents_sect_wise_rg, src_sent_number, src_sent_token_count = b_data
 
                         # print(sent_rg_scores)
                         # import pdb;pdb.set_trace()
@@ -787,18 +845,19 @@ def _format_to_bert(params):
                                        "src_sent_labels": sent_rg_scores.copy() if sent_rg_scores is not None else sent_sections,
                                        "sent_labels": sent_labels.copy(),
                                        "segs": segments_ids, 'clss': cls_ids,
-                                       'src_txt': src_txt, "tgt_txt": tgt_txt, "paper_id": paper_id + '___' + 'single',
+                                       'src_txt': src_txt, "tgt_txt": tgt_txt, "paper_id": paper_id + '___' + 'single' + '___' + datetime.now().strftime('%Y%m-%d%H-%M%S-') + str(uuid4()),
                                        "sent_sect_labels": [0 for _ in range(len(sent_sections))], "segment_rg_score": 0,
-                                       "sent_sections_txt": sent_sections, "sent_sect_wise_rg": sents_sect_wise_rg}
-                        papers_ids.add(paper_id)
+                                       "sent_sections_txt": sent_sections, "sent_sect_wise_rg": sents_sect_wise_rg, "sent_numbers":src_sent_number,
+                                       "sent_token_count":src_sent_token_count}
+                        papers_ids.add(paper_id.split('___')[0])
                         datasets.append(b_data_dict)
                 except:
                     # import pdb;
                     # pdb.set_trace()
-
-
                     with open('not_parsed.txt', mode='a') as F:
-                        F.write(save_file + ' idx: ' + str(j) + '\n')
+                        F.write(save_file + ' idx: ' + str(j) + ' paper_id: ' + str(paper_id) + '\n')
+                    # print(paper_id)
+
                     continue
 
     print('Processed instances %d data' % len(datasets))
@@ -842,71 +901,82 @@ def format_longsum_to_lines(args):
             dataset = []
             p_ct = 0
             all_papers_count = 0
+            curr_paper_count = 0
             ##########################
             ###### <DEBUGGING> #######
             ##########################
 
-            for a in tqdm(a_lst, total=len(a_lst)):
-                d = _format_longsum_to_lines(a)
-                if d is not None:
-                    # dataset.extend(d[0])
-                    dataset.append(d)
-                    if (len(dataset) > args.shard_size):
-                        pt_file = "{:s}{:s}.{:d}.json".format(args.save_path + '', corpus_type, p_ct)
-                        check_path_existence(args.save_path)
-                        print(pt_file)
-                        with open(pt_file, 'w') as save:
-                            # save.write('\n'.join(dataset))
-                            save.write(json.dumps(dataset))
-                            print('data len: {}'.format(len(dataset)))
-                            p_ct += 1
-                            all_papers_count += len(dataset)
-                            dataset = []
-            if (len(dataset) > 0):
-
-                pt_file = "{:s}{:s}.{:d}.json".format(args.save_path + '', corpus_type, p_ct)
-                print(pt_file)
-                with open(pt_file, 'w') as save:
-                    # save.write('\n'.join(dataset))
-                    save.write(json.dumps(dataset))
-                    p_ct += 1
-                    all_papers_count += len(dataset)
-                    dataset = []
-
-            print('Processed {} papers for {} set'.format(all_papers_count, corpus_type))
-            ###########################
-            ###### </DEBUGGING> #######
-            ###########################
-
-            check_path_existence(args.save_path)
-
-            # for d in tqdm(pool.imap_unordered(_format_longsum_to_lines, a_lst), total=len(a_lst)):
-            #     # d_1 = d[1]
+            # for a in tqdm(a_lst, total=len(a_lst)):
+            #     d = _format_longsum_to_lines_section_based(a)
             #     if d is not None:
             #         # dataset.extend(d[0])
             #         dataset.append(d)
-            #
             #         if (len(dataset) > args.shard_size):
             #             pt_file = "{:s}{:s}.{:d}.json".format(args.save_path + '', corpus_type, p_ct)
+            #             check_path_existence(args.save_path)
             #             print(pt_file)
             #             with open(pt_file, 'w') as save:
             #                 # save.write('\n'.join(dataset))
             #                 save.write(json.dumps(dataset))
             #                 print('data len: {}'.format(len(dataset)))
             #                 p_ct += 1
+            #                 all_papers_count += len(dataset)
             #                 dataset = []
-            #
-            # pool.close()
-            # pool.join()
-            #
             # if (len(dataset) > 0):
+            #
             #     pt_file = "{:s}{:s}.{:d}.json".format(args.save_path + '', corpus_type, p_ct)
             #     print(pt_file)
             #     with open(pt_file, 'w') as save:
             #         # save.write('\n'.join(dataset))
             #         save.write(json.dumps(dataset))
             #         p_ct += 1
+            #         all_papers_count += len(dataset)
             #         dataset = []
+            #
+            # print('Processed {} papers for {} set'.format(all_papers_count, corpus_type))
+            ###########################
+            ###### </DEBUGGING> #######
+            ###########################
+
+            check_path_existence(args.save_path)
+
+            # for d in tqdm(pool.imap_unordered(_format_longsum_to_lines_section_based, a_lst), total=len(a_lst)):
+            for d in tqdm(pool.imap_unordered(_format_longsum_to_lines, a_lst), total=len(a_lst)):
+                # d_1 = d[1]
+                if d is not None:
+                    all_papers_count+=1
+                    curr_paper_count+=1
+
+                    # dataset.extend(d[0])
+                    dataset.append(d)
+                    # import pdb;pdb.set_trace()
+                    # if (len(dataset) > args.shard_size):
+                    if (curr_paper_count > args.shard_size):
+                        pt_file = "{:s}{:s}.{:d}.json".format(args.save_path + '', corpus_type, p_ct)
+                        print(pt_file)
+                        with open(pt_file, 'w') as save:
+                            # save.write('\n'.join(dataset))
+                            save.write(json.dumps(dataset))
+                            print('data len: {}'.format(len(dataset)))
+                            p_ct += 1
+                            dataset = []
+                        curr_paper_count = 0
+
+
+            pool.close()
+            pool.join()
+
+            if (len(dataset) > 0):
+                pt_file = "{:s}{:s}.{:d}.json".format(args.save_path + '', corpus_type, p_ct)
+                print(pt_file)
+                # all_papers_count += len(dataset)
+                with open(pt_file, 'w') as save:
+                    # save.write('\n'.join(dataset))
+                    save.write(json.dumps(dataset))
+                    p_ct += 1
+
+                    dataset = []
+            print('Processed {} papers for {} set'.format(all_papers_count, corpus_type))
 
     # sections = sorted(sections.items(), key=lambda x: x[1], reverse=True)
     # sections = dict(sections)
@@ -925,10 +995,10 @@ def _format_longsum_to_lines(params):
 
         # if len(paper['sentences']) < 10 or sum([len(sent) for sent in paper['gold']]) < 10:
         #     return -1, 0, 0
-        # try:
-        #     id = paper['filename']
-        # except:
-        id = paper['id']
+        try:
+            id = paper['filename']
+        except:
+            id = paper['id']
 
         # for sent in paper['sentences']:
         #     tokens = sent[0]
@@ -955,7 +1025,6 @@ def _format_longsum_to_lines_section_based(params):
 
     def load_json(src_json, lower=True):
         paper = json.load(open(src_json))
-
         # main_sections = _get_main_sections(paper['sentences'])
         # try:
         # main_sections = _get_main_sections(paper['sentences'])
@@ -963,10 +1032,14 @@ def _format_longsum_to_lines_section_based(params):
         #     main_sections = _get_main_sections(paper['sentences'])
         # sections_text = [''.join([s for s in v if not s.isdigit()]).replace('.','').strip().lower() for v in main_sections.values()]
 
-        if len(paper['sentences']) < 10 or sum([len(sent) for sent in paper['gold']]) < 10:
-            return -1, 0, 0
+        # if len(paper['sentences']) < 10 or sum([len(sent) for sent in paper['gold']]) < 10:
+        #     return -1, 0, 0
 
-        id = paper['filename']
+        try:
+            id = paper['filename']
+        except:
+            id = paper['id']
+
         # for sent in paper['sentences']:
         #     tokens = sent[0]
         # if keep_sect_num:
@@ -977,31 +1050,40 @@ def _format_longsum_to_lines_section_based(params):
         cur_sect_sents = []
         sections_textual = []
         for i, sent in enumerate(paper['sentences']):
+            if not str(sent[0]).isdigit():
+                sent = [0] + sent
             if i == 0:
-                cur_sect = sent[1]
-                sections_textual.append(sent[1])
+                cur_sect = sent[2]
+                sections_textual.append(sent[2])
                 cur_sect_sents.append(sent)
                 continue
             else:
-                if cur_sect == sent[1]:
+                if cur_sect == sent[2]:
                     cur_sect_sents.append(sent)
+                    if i == len(paper['sentences']) - 1:
+                        sections.append(cur_sect_sents.copy())
+                        cur_sect_sents.clear()
+                        break
                 else:
-                    cur_sect = sent[1]
-                    sections_textual.append(sent[1])
+                    cur_sect = sent[2]
+                    sections_textual.append(sent[2])
                     sections.append(cur_sect_sents.copy())
                     cur_sect_sents.clear()
+
 
         tgts = []
         ids = []
         for j, _ in enumerate(sections):
             tgts.append(paper['gold'])
-            ids.append(id + "__" + str(sections_textual[j]))
+            ids.append(id + "___" + str(sections_textual[j]))
+
         return sections, tgts, ids, sections_textual
 
     paper_sect_sents, paper_tgts, ids, sections_text = load_json(src_path)
 
-    if paper_sect_sents == -1:
-        return None
+    # if paper_sect_sents == -1:
+    #     return None
+
 
     out = []
     for j, sect_sents in enumerate(paper_sect_sents):

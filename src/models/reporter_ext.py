@@ -315,8 +315,13 @@ class Statistics(object):
         self.r2 = r2
         self.rl = rl
 
-    def set_ir_metrics(self, p):
+    def set_overall_recall(self, recall):
+        self.top_sents_recall = recall
+
+    def set_ir_metrics(self, f, p, r):
+        self.f = f
         self.p = p
+        self.r = r
 
     def total_loss(self):
         """ compute cross entropy """
@@ -427,7 +432,9 @@ class Statistics(object):
             writer.add_scalar(prefix + "/Rouge-2", self.r2, step)
             writer.add_scalar(prefix + "/Rouge-l", self.rl, step)
 
-            # writer.add_scalar(prefix + "/Precision", self.p, step)
+            writer.add_scalar(prefix + "/Precision", self.p, step)
+            writer.add_scalar(prefix + "/Recall", self.r, step)
+            writer.add_scalar(prefix + "/F-score", self.f, step)
 
 
             # writer.add_scalars(prefix + "/Section-wise-acc", {

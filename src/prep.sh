@@ -111,12 +111,6 @@ BERT_DIR=$BASE_DIR/bert-files/
 
 ############### Normal- experiments Longsumm #################
 
-# Arxiv
-#BASE_DIR=/disk1/sajad/datasets/sci/arxiv/
-#RAW_PATH=$BASE_DIR/my-format-sample/
-#SAVE_JSON=$BASE_DIR/my-format-sample/jsons/
-#BERT_DIR=$BASE_DIR/my-format-sample/bert-files/512-section-arxiv/
-
 
 # CSP
 #BASE_DIR=/disk1/sajad/datasets/sci/arxiv/
@@ -125,22 +119,26 @@ BERT_DIR=$BASE_DIR/bert-files/
 #BERT_DIR=$BASE_DIR/my-format-sample/bert-files/512-section-arxiv/
 
 # Longsumm
-#BASE_DIR=/disk1/sajad/datasets/sci/longsumm/new-abs-set/
-#RAW_PATH=$BASE_DIR/splits/
-#SAVE_JSON=$BASE_DIR/jsons/whole-raw-abs/
-#BERT_DIR=$BASE_DIR/bert-files/512-whole-sectioned-raw-abs/
+BASE_DIR=/disk1/sajad/datasets/sci/longsumm/
+RAW_PATH=$BASE_DIR/my-format-splits/
+SAVE_JSON=$BASE_DIR/jsons/whole/
+BERT_DIR=$BASE_DIR/bert-files/2500-segmented-shrunk/
+
+# /disk1/sajad/datasets/sci/longsumm/bert-files/2500-segmented/
 
 # PubMed-long
-BASE_DIR=/disk1/sajad/datasets/sci/pubmed-dataset/
-RAW_PATH=$BASE_DIR/single_files/my-format/
-SAVE_JSON=$BASE_DIR/jsons-whole/
-BERT_DIR=$BASE_DIR/bert-files/512-whole-segmented/
+#BASE_DIR=/disk1/sajad/datasets/sci/pubmed-long/
+#RAW_PATH=$BASE_DIR/my-format-splits/
+#SAVE_JSON=$BASE_DIR/jsons-whole/
+##BERT_DIR=$BASE_DIR/bert-files/2500-whole-segmented-longformer-ph2/
+#BERT_DIR=$BASE_DIR/bert-files/512-whole-segmented-seqLabelled-20-1/
+#/disk1/sajad/datasets/sci/pubmed-long/bert-files/512-whole-segmented-seqLabelled-20-1/
 
 # arxiv-long
 #BASE_DIR=/disk1/sajad/datasets/sci/arxiv-long/v1/
 #RAW_PATH=$BASE_DIR/my-format-splits/
-#SAVE_JSON=$BASE_DIR/jsons/whole/
-#BERT_DIR=$BASE_DIR/bert-files/512-whole-sectioned-sectiontext-sectRg/
+#SAVE_JSON=$BASE_DIR/jsons/sectioned/
+#BERT_DIR=$BASE_DIR/bert-files/512-segmented-sectioned-scibert/
 
 # csabs
 #BASE_DIR=/disk1/sajad/datasets/sci/csabs/
@@ -148,46 +146,47 @@ BERT_DIR=$BASE_DIR/bert-files/512-whole-segmented/
 #SAVE_JSON=$BASE_DIR/json/
 #BERT_DIR=$BASE_DIR/bert-files/5l-csabs/
 
-# main-arxiv
-#BASE_DIR=//disk1/sajad/datasets/sci/arxiv-dataset/
+## main-arxiv
+#BASE_DIR=/disk1/sajad/datasets/sci/arxiv-dataset/
 #RAW_PATH=$BASE_DIR/single_files/my-format/
 #SAVE_JSON=$BASE_DIR/jsons/whole/
-#BERT_DIR=$BASE_DIR/bert-files/512-whole-sectioned/
+#BERT_DIR=$BASE_DIR/bert-files/2500-whole-segmented-longformer/
 
 
 
 echo "Starting to write aggregated json files..."
 echo "-----------------"
 
-
-for SET in train
-do
-    python3 preprocess.py -mode format_longsum_to_lines \
-                        -save_path $SAVE_JSON  \
-                        -n_cpus 22 \
-                        -keep_sect_num \
-                        -shard_size 300 \
-                        -log_file ../logs/preprocess.log \
-                        -raw_path $RAW_PATH/$SET/ \
-                        -dataset $SET
-done
+#
+#for SET in val test train
+#do
+#    python3 preprocess.py -mode format_longsum_to_lines \
+#                        -save_path $SAVE_JSON  \
+#                        -n_cpus 24 \
+#                        -keep_sect_num \
+#                        -shard_size 150 \
+#                        -log_file ../logs/preprocess.log \
+#                        -raw_path $RAW_PATH/$SET/ \
+#                        -dataset $SET
+#done
 
 echo "-----------------"
 echo "Now starting to write torch files..."
 echo "-----------------"
 
-for SET in train
+for SET in val
 do
     python3 preprocess.py -mode format_to_bert \
                         -bart \
-                        -model_name scibert \
-                        -lower \
+                        -model_name longformer \
                         -dataset $SET \
                         -id_files_src $id_files_src \
                         -raw_path $SAVE_JSON/ \
                         -save_path $BERT_DIR/ \
                         -n_cpus 24 \
-                        -lower \
-                        -log_file ../logs/preprocess.log
+                        -log_file ../logs/preprocess.log \
+                        -sent_numbers_file save_lists/lsum-$SET-longformer-multi50-aftersdu-top-sents.p
+#                        -lower \
+
 done
-##
+###

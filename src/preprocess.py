@@ -38,7 +38,7 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
-
+ 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     parser.add_argument("-model_name", default='bert-base')
 
     parser.add_argument("-shard_size", default=2000, type=int)
-    parser.add_argument('-min_src_nsents', default=1, type=int)
+    parser.add_argument('-min_src_nsents', default=2, type=int)
     parser.add_argument('-max_src_nsents', default=600, type=int)
     parser.add_argument('-min_src_ntokens_per_sent', default=5, type=int)
     parser.add_argument('-max_src_ntokens_per_sent', default=150, type=int)
@@ -68,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('-log_file', default='../../logs/cnndm.log')
 
     parser.add_argument('-dataset', default='')
+    parser.add_argument('-sent_numbers_file', default='')
     parser.add_argument('-id_files_src', default='')
 
     parser.add_argument('-n_cpus', default=2, type=int)

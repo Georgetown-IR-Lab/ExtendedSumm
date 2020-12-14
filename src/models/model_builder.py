@@ -156,7 +156,15 @@ class Bert(nn.Module):
         else:
             self.eval()
             with torch.no_grad():
-                top_vec, _ = self.model(x, attention_mask=mask_src, token_type_ids=segs)
+                if self.model_name == 'bert' or self.model_name == 'scibert':
+                    top_vec, _ = self.model(x, attention_mask=mask_src, token_type_ids=segs)
+
+                elif self.model_name == 'longformer':
+                    global_mask = torch.zeros(mask_src.shape, dtype=torch.long, device='cuda').unsqueeze(0)
+                    global_mask[:, :, clss.long()] = 1
+                    global_mask = global_mask.squeeze(0)
+
+                    top_vec, _ = self.model(x, attention_mask=mask_src.long(), global_attention_mask=global_mask)
 
         return top_vec
 
@@ -172,6 +180,9 @@ class ExtSummarizer(nn.Module):
         if is_joint:
             self.uncertainty_loss = UncertaintyLoss()
             self.section_predictor = SectionExtLayer()
+            self.loss_sentence_picker = torch.nn.BCELoss(reduction='none')
+            self.loss_section_predictor = torch.nn.CrossEntropyLoss(reduction='none')
+
 
         if not is_joint and not rg_predictor:
             self.loss_sentence_picker = torch.nn.BCELoss(reduction='none')
@@ -179,7 +190,7 @@ class ExtSummarizer(nn.Module):
         if rg_predictor:
             self.loss_sentence_picker = torch.nn.MSELoss(reduction='none')
 
-
+        self.args = args
         # for p in self.sentence_encoder.parameters():
         #     if p.dim() > 1:
         #         xavier_uniform_(p)
@@ -235,7 +246,21 @@ class ExtSummarizer(nn.Module):
         if self.is_joint:
             sect_scores = self.section_predictor(encoded, mask_cls)
 
-            loss, loss_sent, loss_sect = self.uncertainty_loss(sent_score, sent_bin_labels, sect_scores, sent_sect_labels, mask=mask_cls)
+            if self.args.alpha_mtl != -1:
+                loss_sent = self.loss_sentence_picker(sent_score, sent_bin_labels.float())
+                loss_sent = ((loss_sent * mask_cls.float()).sum() / mask_cls.sum(dim=1)).sum()
+                if not is_inference:
+                    loss_sent = loss_sent / loss_sent.numel()
+
+                loss_sect = self.loss_section_predictor(sect_scores.permute(0, 2, 1), sent_sect_labels)
+                loss_sect = ((loss_sect * mask_cls.float()).sum() / mask_cls.sum(dim=1)).sum()
+                if not is_inference:
+                    loss_sect = (loss_sect / loss_sect.numel())
+
+                loss = (self.args.alpha_mtl) * loss_sent + (1-(self.args.alpha_mtl)) * loss_sect
+
+            else:
+                loss, loss_sent, loss_sect = self.uncertainty_loss(sent_score, sent_bin_labels, sect_scores, sent_sect_labels, mask=mask_cls)
 
             # factor0 = torch.div(1.0, self.uncertainty_loss._sigmas_sq[0])
             # factor1 = torch.div(1.0, self.uncertainty_loss._sigmas_sq[1])
@@ -245,7 +270,10 @@ class ExtSummarizer(nn.Module):
 
         else:
             if not self.rg_predictor:
-                loss = self.loss_sentence_picker(sent_score, sent_bin_labels.float())
+                try:
+                    loss = self.loss_sentence_picker(sent_score, sent_bin_labels.float())
+                except:
+                    import pdb;pdb.set_trace()
                 loss = ((loss * mask_cls.float()).sum() / mask_cls.sum(dim=1)).sum()
                 if not is_inference:
                     loss = loss / loss.numel()
@@ -345,6 +373,7 @@ class SentenceExtLayer(nn.Module):
 
     def forward(self, x, mask):
         # sent_scores = self.seq_model(x)
+        # import pdb;pdb.set_trace()
         sent_scores = self.sigmoid(self.wo(x))
 
         # modules = [module for k, module in self.seq_model._modules.items()]

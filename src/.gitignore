@@ -1,2 +1,5 @@
 *.csv
+*.txt
+change_labels_sequential.py
+calculate_oracle_from_bertfiles.py
 !.gitignore

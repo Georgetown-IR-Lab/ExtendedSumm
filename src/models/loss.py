@@ -300,3 +300,4 @@ def shards(state, shard_size, eval_only=False):
                                      [v_chunk.grad for v_chunk in v_split]))
         inputs, grads = zip(*variables)
         torch.autograd.backward(inputs, grads)
+

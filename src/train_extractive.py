@@ -201,7 +201,8 @@ def test_ext(args, device_id, pt, step, is_joint=False):
     # trainer.test(test_iter, step)
     # trainer.test(test_iter_fct, step)
     # trainer.validate_rouge_mmr(test_iter_fct, step)
-    trainer.validate_rouge(test_iter_fct, step)
+    # trainer.validate_rouge(test_iter_fct, step)
+    trainer.validate_rouge_baseline(test_iter_fct, step, write_scores_to_pickle=True)
     # trainer.validate_cls(test_iter_fct, step)
 
 def train_ext(args, device_id, is_joint=False):

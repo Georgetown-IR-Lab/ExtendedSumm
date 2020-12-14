@@ -6,6 +6,7 @@ import random
 import torch
 
 from others.logging import logger
+from sect_infos import get_sect_kws
 
 
 class Batch(object):
@@ -22,31 +23,38 @@ class Batch(object):
         #     pdb.set_trace()
         self.PAD_ID = -1
 
-        def labelize(lists, paper_id = ''):
+        def labelize(section_ids, sent_sect_headings=None, paper_id =''):
             pass
-            # for list in lists:
-            #     for j, elem in enumerate(list):
-            #         if elem == 0:
-            #             list[j] = 0
-            #         if elem == 1:
-            #             list[j] = 1
-            #         if elem ==2:
-            #             list[j] = 2
-            #         if elem == 3:
-            #             list[j] = 3
-            #         if elem == 4:
-            #             list[j] = 4
+            # def is_heading_in_kws(heading, kws):
+            #     for kw in kws:
+            #         if len(kw.split(' ')) < len(heading.split(' ')):
+            #             if kw in heading:
+            #                 return True
+            #         else:
+            #             if heading in kw:
+            #                 return True
+            #     return False
+            #
+            # abstract_kws = get_sect_kws(dataset='longsumm', section='abstract')
+            # conc_kws = get_sect_kws(dataset='longsumm', section='conclusion')
+            # import pdb;pdb.set_trace()
+            # for section_id, sect_headings in zip(section_ids, sent_sect_headings):
 
-        def labelize_str_convert(lists):
-            for list in lists:
-                for j, elem in enumerate(list):
+            # for j, elem in enumerate(section_ids):
+            #     # if is_heading_in_kws(sect_headings[j].lower(), abstract_kws) or is_heading_in_kws(sect_headings[j].lower(), conc_kws):
+            #     #     section_id[j] = 5
+            #     # else:
+            #     if elem == 0:
+            #         section_ids[j] = 0
+            #     if elem == 1:
+            #         section_ids[j] = 1
+            #     if elem ==2:
+            #         section_ids[j] = 2
+            #     if elem == 3:
+            #         section_ids[j] = 3
+            #     if elem == 4:
+            #         section_ids[j] = 3
 
-                    try:
-                        assigned = int(elem)
-                    except:
-                        assigned = 99
-
-                    list[j] = assigned
 
         if data is not None:
             self.batch_size = len(data)
@@ -58,18 +66,21 @@ class Batch(object):
             pre_sent_labels = [x[5] for x in data]
             if not is_test:
                 sent_sect_labels = [x[6] for x in data]
+                sent_sect_headings = [x[9] for x in data]
 
                 # for debugging comment it out after!
-                paper_id = [x[-2] for x in data]
+                paper_id = [x[7] for x in data]
 
 
                 # labelize_str_convert(sent_sect_labels)
-                labelize(sent_sect_labels, paper_id)
+                labelize(sent_sect_labels, sent_sect_headings=sent_sect_headings, paper_id=paper_id)
             else:
                 if is_test:
                     sent_sect_labels = [x[8] for x in data]
                     # labelize_str_convert(sent_sect_labels)
-                    labelize(sent_sect_labels)
+                    sent_sect_headings = [x[11] for x in data]
+
+                    labelize(sent_sect_labels, sent_sect_headings=sent_sect_headings)
                     paper_id = [x[9] for x in data]
                     # section_rg = [x[10] for x in data]
 
@@ -77,8 +88,6 @@ class Batch(object):
             tgt = torch.tensor(self._pad(pre_tgt, 0))
 
             segs = torch.tensor(self._pad(pre_segs, 0))
-            # mask_src = 1 - (src == 0)
-            # mask_tgt = 1 - (tgt == 0)
 
             mask_src = ~(src == self.PAD_ID)
             mask_tgt = ~(tgt == self.PAD_ID)
@@ -124,9 +133,13 @@ class Batch(object):
             setattr(self, 'sent_sect_labels', sent_sect_labels.to(device))
 
             # just for debugging
-            src_str = [x[-1] for x in data]
+            src_str = [x[8] for x in data]
+            sent_number = [x[10] for x in data]
+            sent_token_count = [x[11] for x in data]
             setattr(self, 'src_str', src_str)
             setattr(self, 'paper_id', paper_id)
+            setattr(self, 'sent_number', sent_number)
+            setattr(self, 'sent_token_count', sent_token_count)
 
             if (is_test):
                 setattr(self, 'paper_id', paper_id)
@@ -134,11 +147,17 @@ class Batch(object):
                 setattr(self, 'src_str', src_str)
                 tgt_str = [x[7] for x in data]
                 setattr(self, 'tgt_str', tgt_str)
-                # sent_sections_txt = [x[11] for x in data]
-                # sent_sect_wise_rg = [x[11] for x in data]
+                sent_sections_txt = [x[11] for x in data]
+                sent_sect_wise_rg = [x[12] for x in data]
 
-                # setattr(self, 'sent_sections_txt', sent_sections_txt)
-                # setattr(self, 'sent_sect_wise_rg', sent_sect_wise_rg)
+                sent_number = [x[13] for x in data]
+                sent_token_count = [x[14] for x in data]
+
+                setattr(self, 'sent_numbers', sent_number)
+                setattr(self, 'sent_token_count', sent_token_count)
+
+                setattr(self, 'sent_sections_txt', sent_sections_txt)
+                setattr(self, 'sent_sect_wise_rg', sent_sect_wise_rg)
 
                 # sent_sect_labels = [x[-2] for x in data]
                 # setattr(self, 'sent_sect_labels', sent_sect_labels)
@@ -163,27 +182,33 @@ def load_dataset(args, corpus_type, shuffle):
 
     def _lazy_dataset_loader(pt_file, corpus_type):
         # if corpus_type == 'val':
-        #     dataset = torch.load(pt_file)[:20]
+        # dataset = torch.load(pt_file)[:100]
         # else:
         dataset = torch.load(pt_file)
         logger.info('Loading %s dataset from %s, number of examples: %d' %
-                    (corpus_type, pt_file, len(dataset)))
+              (corpus_type, pt_file, len(dataset)))
         return dataset
 
     # Sort the glob output by file name (by increasing indexes).
     # if corpus_type == "val":
     #     pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.3.*.pt'))
-    # else:
+
     if corpus_type == 'val' or corpus_type=='test':
         pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt'), reverse=True)
         pts = [(int(f.split('.')[-3]), f) for f in pts]
         pts = sorted(pts, key=lambda tup: tup[0], reverse=False)
         pts = [p[1] for p in pts]
+
+        # pts = [pts[-1]]
+
+
     elif corpus_type=='train':
         pts = sorted(glob.glob(args.bert_data_path + '/' + corpus_type + '.*.pt'), reverse=True)
         import random
         random.seed(888)
         random.shuffle(pts)
+        # pts = pts[:40]
+        # pts = glob.glob(args.bert_data_path + '/' + corpus_type + '.6.bert.pt')
 
     if pts:
         if (shuffle):
@@ -289,10 +314,8 @@ class DataIterator(object):
         return xs
 
     def preprocess(self, ex, is_test):
-
         src = ex['src']
         tgt = ex['tgt'][:self.args.max_tgt_len][:-1] + [2]
-        # import pdb;pdb.set_trace()
         src_sent_labels = ex['src_sent_labels']
         sent_labels = ex['sent_labels']
         segs = ex['segs']
@@ -300,10 +323,24 @@ class DataIterator(object):
             segs = [0] * len(segs)
         clss = ex['clss']
         src_txt = ex['src_txt']
+
+        if "sent_numbers" in ex.keys():
+            sent_numbers = ex['sent_numbers']
+            sent_token_count = ex['sent_token_count']
+            sent_token_count = None
+        else:
+            sent_numbers = None
+            sent_token_count = None
+
         tgt_txt = ex['tgt_txt']
         paper_id = ex['paper_id']
-        # sent_sections_txt = ex['sent_sections_txt']
-        # sent_sect_wise_rg = ex['sent_sect_wise_rg']
+        try:
+            sent_sections_txt = ex['sent_sections_txt']
+            sent_sect_wise_rg = ex['sent_sect_wise_rg']
+        except:
+            sent_sections_txt = None
+            sent_sect_wise_rg = None
+
         if 'segment_rg_score' not in ex.keys():
             section_rg = [0 for _ in range(len(clss))]
         else:
@@ -323,14 +360,15 @@ class DataIterator(object):
         sent_labels = sent_labels[:max_sent_id]
         clss = clss[:max_sent_id]
         src_txt = src_txt[:max_sent_id]
-        # sent_sections_txt = sent_sections_txt[:max_sent_id]
+        if sent_sections_txt is not None:
+            sent_sections_txt = sent_sections_txt[:max_sent_id]
         sent_sect_labels = sent_sect_labels[:max_sent_id]
 
         # import pdb;pdb.set_trace()
         if (is_test):
-            return src, tgt, segs, clss, src_sent_labels, sent_labels, src_txt, tgt_txt, sent_sect_labels, paper_id, section_rg
+            return src, tgt, segs, clss, src_sent_labels, sent_labels, src_txt, tgt_txt, sent_sect_labels, paper_id, section_rg, sent_sections_txt, sent_sect_wise_rg, sent_numbers, sent_token_count
         else:
-            return src, tgt, segs, clss, src_sent_labels, sent_labels, sent_sect_labels, paper_id, src_txt
+            return src, tgt, segs, clss, src_sent_labels, sent_labels, sent_sect_labels, paper_id, src_txt, sent_sections_txt, sent_numbers, sent_token_count
 
     def batch_buffer(self, data, batch_size):
         minibatch, size_so_far = [], 0

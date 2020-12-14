@@ -16,7 +16,7 @@ python train.py -task ext \
                 -ext_dropout 0.1 \
                 -model_path $MODEL_PATH \
                 -lr 2e-3 \
-                -visible_gpus 0,1 \
+                -visible_gpus $CUDA_VISIBLE_DEVICES \
                 -val_pred_len 7 \
                 -report_every 50 \
                 -log_file $LOG_DIR \

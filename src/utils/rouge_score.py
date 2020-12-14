@@ -46,7 +46,7 @@ def evaluate_rouge(hypotheses, references, type='f'):
     return results_avg['rouge1_' + type], results_avg['rouge2_'+ type], results_avg['rougeL_'+ type]
 
 
-def evaluate_rouge_avg(hypotheses, references, type='f'):
+def evaluate_rouge_avg(hypotheses, references, type='f', use_progress_bar=False):
     metrics = ['rouge1', 'rouge2', 'rougeL']
     scorer = {}
     scorer["rouge"] = rouge_scorer.RougeScorer(metrics, use_stemmer=True)
@@ -58,16 +58,28 @@ def evaluate_rouge_avg(hypotheses, references, type='f'):
     hypotheses = list(hypotheses)
     references = list(references)
 
-    for j, hyp in enumerate(hypotheses):
-        submission_summary = hyp.replace('<q>', ' ')
-        for key, scorr in scorer.items():
-            scores_i = scorr.score(references[j].strip(), submission_summary)
-            aggregators_dict[key].add_scores(scores_i)
+    if not use_progress_bar:
+        for j, hyp in enumerate(hypotheses):
+            submission_summary = hyp.replace('<q>', ' ')
+            for key, scorr in scorer.items():
+                scores_i = scorr.score(references[j].strip(), submission_summary)
+                aggregators_dict[key].add_scores(scores_i)
 
-    aggregates_dict = {k: v.aggregate() for k, v in aggregators_dict.items()}
-    out_avg_scores = {}
-    for k, v in sorted(aggregates_dict["rouge"].items()):
-        out_avg_scores[k] = v.mid.fmeasure
+        aggregates_dict = {k: v.aggregate() for k, v in aggregators_dict.items()}
+        out_avg_scores = {}
+        for k, v in sorted(aggregates_dict["rouge"].items()):
+            out_avg_scores[k] = v.mid.fmeasure
+    else:
+        for j, hyp in tqdm(enumerate(hypotheses), total=len(hypotheses)):
+            submission_summary = hyp.replace('<q>', ' ')
+            for key, scorr in scorer.items():
+                scores_i = scorr.score(references[j].strip(), submission_summary)
+                aggregators_dict[key].add_scores(scores_i)
+
+        aggregates_dict = {k: v.aggregate() for k, v in aggregators_dict.items()}
+        out_avg_scores = {}
+        for k, v in sorted(aggregates_dict["rouge"].items()):
+            out_avg_scores[k] = v.mid.fmeasure
     return out_avg_scores['rouge1'], out_avg_scores['rouge2'], out_avg_scores['rougeL']
 
 
