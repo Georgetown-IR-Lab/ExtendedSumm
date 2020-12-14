@@ -32,18 +32,18 @@ tar -xvf pubmed.tar.gz
 This will uncompress the tar file into the current directory. The directory will include the single json files of different sets including training, validation, and test. 
 
 **FORMAT** Each file is a json object with keys (and structure) as below:
-- "gold"  _(List <List<>>)_: the ground-truth summary of the paper, where the innter list is the tokens associated with each gold summary sentence.
 
+- "id" _(String)_:  the paper ID
+- "abstract" _(String)_: the abstract text of the paper. This field is different from "gold" field for the datasets that have different ground-truth than the abstract. 
+- "gold"  _(List <List<>>)_: the ground-truth summary of the paper, where the innter list is the tokens associated with each gold summary sentence.
 - "sentences" _(List <List<>>)_: the source sentences of the full-text. The inner list contains 5 indeces, each of which represent different fields of the source sentence:
-    
     * Index [0]: tokens of the sentences (i.e., list of tokens).
     * Index [1]: textual representation of the section that the sentence belongs to. 
     * Index [2]: RG-L score of the sentence with the gold summary.
     * Index [3]: textual representation of the sentences.
     * Index [4]: oracle label associated with the sentence (0, or 1). 
 
-- "id": the paper ID
-- "abstract": the abstract text of the paper. This field is different from "gold" field for the datasets that have different ground-truth than the abstract. 
+
 
 
 ## Training 
@@ -92,17 +92,8 @@ python train.py -task ext \
 The inference scripts are inside `test.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
 
 ```
-#########################
-######### Data #########
-#########################
-
 # path to the data directory
 BERT_DIR=/disk1/sajad/datasets/sci/longsumm/bert-files/2500-segmented-seqLabelled-30/
-
-
-#########################
-######### MODELS#########
-#########################
 
 # path to the trained model directory
 MODEL_PATH=/disk1/sajad/sci-trained-models/presum/LSUM-2500-segmented-sectioned-multi50-classi-v1/
@@ -110,7 +101,7 @@ MODEL_PATH=/disk1/sajad/sci-trained-models/presum/LSUM-2500-segmented-sectioned-
 # path to the best trained model (or the checkpoint that you want to run inference on)
 CHECKPOINT=$MODEL_PATH/Recall_BEST_model_s63000_0.4910.pt
 
-
+# GPU machines, either multi or single GPU
 export CUDA_VISIBLE_DEVICES=0,1
 MAX_POS=2500
 
