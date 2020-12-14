@@ -134,3 +134,25 @@ do
                     -alpha_mtl 0.50
 done
  ```
+
+## Citation
+
+If you plan to use this work, please cite the following papers:
+
+````
+@inproceedings{Sotudeh2021ExtendedSumm,
+  title={On Generating Extended Summaries of Long Documents},
+  author={Sajad Sotudeh and Arman Cohan and Nazli Goharian},
+  booktitle={The AAAI-21 Workshop on Scientific Document Understanding (SDU 2021)},
+  year={2021}
+}
+````
+
+````
+@inproceedings{Sotudeh2020LongSumm,
+  title={GUIR @ LongSumm 2020: Learning to Generate Long Summaries from Scientific Documents},
+  author={Sajad Sotudeh and Arman Cohan and Nazli Goharian},
+  booktitle={First Workshop on Scholarly Document Processing (SDP 2020)},
+  year={2020}
+}
+````
