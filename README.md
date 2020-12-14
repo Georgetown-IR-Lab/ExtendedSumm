@@ -1,9 +1,7 @@
-# SciPreSum
-Scientific Summarization System
+# ExtendedSumm
+This repository contains the implementation details and datasets used in [On Generating Extended Summaries of Long Documents][http://ir.cs.georgetown.eud] paper at the AAAI-21 Workshop on Scholar Document Understanding (SDU-21)
 
-# How to run...
 
-**IMPORTANT:** The following commands should be run under `src/` directory.
 
 ## Conda environment
 
@@ -12,6 +10,10 @@ To install the required packages, please run conda yml file that you find in the
 ```
 conda env create -f environment.yml
 ```
+
+# How to run...
+
+**IMPORTANT:** The following commands should be run under `src/` directory.
 
 ## Dataset
 
