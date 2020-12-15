@@ -21,7 +21,7 @@ To start with, you first need to download the datasets that are intended to work
 
 | Dataset  | Download Link |
 | :-------- | :-------- |
-| arXiv-Long  | [Download](https://drive.google.com/file/d/1p1lb-Urcpds1Bo9piEYwi1DKS9aXxtIv/view?usp=sharing)  |
+| arXiv-Long  |  [Download](https://drive.google.com/file/d/1p1lb-Urcpds1Bo9piEYwi1DKS9aXxtIv/view?usp=sharing)  |
 | PubMed-Long  | [Download](https://drive.google.com/file/d/1T5xbzE_Y_kfxAPzROVbjTz4L_FFQ9EEu/view?usp=sharing) |
 
 After downloading the dataset, you will need to uncompress it using the following command:
