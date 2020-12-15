@@ -20,11 +20,9 @@ conda env create -f environment.yml
 To start with, you first need to download the datasets that are intended to work with the code base. You can download them from following links: 
 
 | Dataset  | Download Link |
-| -------- | ------------- |
-| arXiv-Long  | [Download]()  |
+| :-------- | :-------- |
+| arXiv-Long  | [Download](https://drive.google.com/file/d/1p1lb-Urcpds1Bo9piEYwi1DKS9aXxtIv/view?usp=sharing)  |
 | PubMed-Long  | [Download]() |
-
-
 
 After downloading the dataset, you will need to uncompress it using the following command:
 
