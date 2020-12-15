@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="5ed4be77-804d-437f-9e99-8363385111ac" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/src/test.sh" afterDir="false" />
-    </list>
+    <list default="true" id="5ed4be77-804d-437f-9e99-8363385111ac" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,8 +58,8 @@
         <entry file="file://$PROJECT_DIR$/README.md">
           <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
             <state split_layout="SPLIT">
-              <first_editor relative-caret-position="272">
-                <caret line="21" column="13" selection-start-line="21" selection-start-column="13" selection-end-line="21" selection-end-column="13" />
+              <first_editor relative-caret-position="-537">
+                <caret line="16" column="1" selection-start-line="16" selection-start-column="1" selection-end-line="16" selection-end-column="1" />
               </first_editor>
               <second_editor />
             </state>
@@ -652,14 +648,34 @@
       <option name="project" value="LOCAL" />
       <updated>1608002481588</updated>
     </task>
-    <option name="localTasksCounter" value="36" />
+    <task id="LOCAL-00036" summary="added pubmed-long download link">
+      <created>1608006078521</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1608006078522</updated>
+    </task>
+    <task id="LOCAL-00037" summary="added pubmed-long download link">
+      <created>1608006104252</created>
+      <option name="number" value="00037" />
+      <option name="presentableId" value="LOCAL-00037" />
+      <option name="project" value="LOCAL" />
+      <updated>1608006104252</updated>
+    </task>
+    <task id="LOCAL-00038" summary="added pubmed-long download link">
+      <created>1608006152408</created>
+      <option name="number" value="00038" />
+      <option name="presentableId" value="LOCAL-00038" />
+      <option name="project" value="LOCAL" />
+      <updated>1608006152408</updated>
+    </task>
+    <option name="localTasksCounter" value="39" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="-15" y="37" width="1920" height="1002" extended-state="0" />
-    <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49701315" visible="true" weight="0.19755058" />
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49701315" visible="true" weight="0.19755058" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" sideWeight="0.50298685" side_tool="true" weight="0.15282215" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -673,7 +689,7 @@
       <window_info anchor="bottom" id="Version Control" order="8" weight="0.32967034" />
       <window_info active="true" anchor="bottom" id="File Transfer" order="9" visible="true" weight="0.26813188" />
       <window_info anchor="bottom" id="Database Changes" order="10" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Terminal" order="11" sideWeight="0.49946752" visible="true" weight="0.32637364" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="11" sideWeight="0.49946752" visible="true" weight="0.56813186" />
       <window_info anchor="bottom" id="Event Log" order="12" sideWeight="0.5005325" side_tool="true" weight="0.32967034" />
       <window_info anchor="bottom" id="Python Console" order="13" />
       <window_info anchor="bottom" id="Concurrent Activities Diagram" order="14" weight="0.32967034" />
@@ -737,7 +753,6 @@
     <option name="myLimit" value="2678400000" />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Updating gitignore" />
     <MESSAGE value="Creating single-task branch" />
     <MESSAGE value="Updating test module in trainer_ext.py to produce long summaries by concatenating each segments sentences." />
     <MESSAGE value="Back to master: producing summaries by taking into account the entire sentence scores computed on segments." />
@@ -762,7 +777,8 @@
     <MESSAGE value="update bash scripts" />
     <MESSAGE value="update prep script" />
     <MESSAGE value="update dataset section" />
-    <option name="LAST_COMMIT_MESSAGE" value="update dataset section" />
+    <MESSAGE value="added pubmed-long download link" />
+    <option name="LAST_COMMIT_MESSAGE" value="added pubmed-long download link" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1172,8 +1188,8 @@
     <entry file="file://$PROJECT_DIR$/README.md">
       <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
         <state split_layout="SPLIT">
-          <first_editor relative-caret-position="272">
-            <caret line="21" column="13" selection-start-line="21" selection-start-column="13" selection-end-line="21" selection-end-column="13" />
+          <first_editor relative-caret-position="-537">
+            <caret line="16" column="1" selection-start-line="16" selection-start-column="1" selection-end-line="16" selection-end-column="1" />
           </first_editor>
           <second_editor />
         </state>
