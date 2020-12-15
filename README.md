@@ -3,7 +3,7 @@ This repository contains the implementation details and datasets used in _[On Ge
 
 
 
-## Conda environment: preliminary setup
+### Conda environment: preliminary setup
 
 To install the required packages, please run conda yml file that you find in the root directory using the following command:
 
@@ -36,13 +36,18 @@ This will uncompress the tar file into the current directory. The directory will
 
 - `"id"` _(String)_:  the paper ID
 - `"abstract"` _(String)_: the abstract text of the paper. This field is different from "gold" field for the datasets that have different ground-truth than the abstract. 
-- `"gold"`  _(List <List<>>)_: the ground-truth summary of the paper, where the innter list is the tokens associated with each gold summary sentence.
+- `"gold"`  _(List <List<>>)_: the ground-truth summary of the paper, where the inner list is the tokens associated with each gold summary sentence.
 - `"sentences"` _(List <List<>>)_: the source sentences of the full-text. The inner list contains 5 indeces, each of which represent different fields of the source sentence:
     * Index [0]: tokens of the sentences (i.e., list of tokens).
     * Index [1]: textual representation of the section that the sentence belongs to. 
-    * Index [2]: RG-L score of the sentence with the gold summary.
+    * Index [2]: Rouge-L score of the sentence with the gold summary.
     * Index [3]: textual representation of the sentences.
     * Index [4]: oracle label associated with the sentence (0, or 1). 
+
+### Preparing data for BertsumExtMulti
+
+Simply run the `prep.sh` bash script with the providing the dataset directory. This script will use to functions to first create aggregated json files, and then preparing them for pretrained language models' usage. 
+
 
 ### Training 
 Now the is the time to train the extractive model. The training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
