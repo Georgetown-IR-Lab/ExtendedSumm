@@ -1,5 +1,5 @@
 # ExtendedSumm
-This repository contains the implementation details and datasets used in _[On Generating Extended Summaries of Long Documents](http://ir.cs.georgetown.eud)_ paper at the AAAI-21 Workshop on Scholar Document Understanding (SDU-21).
+This repository contains the implementation details and datasets used in _[On Generating Extended Summaries of Long Documents](http://ir.cs.georgetown.eud)_ paper at the AAAI-21 Workshop on Scientific Document Understanding (SDU 2021).
 
 
 
@@ -50,10 +50,10 @@ Simply run the `prep.sh` bash script with providing the dataset directory. This 
 
 
 ### Training 
-The full training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at some items that you should probably change to fit in your needs:
- 
+The full training scripts are inside `train.sh` bash file. To run it on your machine, you will need to change the directories to fit in your needs:
+
 ```
-... 
+...
 
 DATA_PATH=/path/to/dataset/torch-files/
 MODEL_PATH=/path/to/saved/model/
@@ -74,7 +74,7 @@ MAX_POS=2500
  ```
 
 ### Inference 
-The inference scripts are inside `test.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
+The inference scripts are inside `test.sh` bash file. To run it on your machine, you will need to modify the file directories:
 
 ```
 ...
