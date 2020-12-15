@@ -44,13 +44,13 @@ This will uncompress the tar file into the current directory. The directory will
     * Index [3]: textual representation of the sentences.
     * Index [4]: oracle label associated with the sentence (0, or 1). 
 
-### Preparing data for BertsumExtMulti
+### Preparing Data
 
-Simply run the `prep.sh` bash script with providing the dataset directory. This script will use to functions to first create aggregated json files, and then preparing them for pretrained language models' usage. 
+Simply run the `prep.sh` bash script with providing the dataset directory. This script will use two functions to first create aggregated json files, and then preparing them for pretrained language models' usage. 
 
 
 ### Training 
-Now the is the time to train the extractive model. The training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
+The training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
 
 ```
 DATA_PATH=/path/to/dataset/512-whole/
@@ -138,7 +138,8 @@ do
 done
  ```
 
-### Citation
+
+## Citation
 
 If you plan to use this work, please cite the following papers:
 

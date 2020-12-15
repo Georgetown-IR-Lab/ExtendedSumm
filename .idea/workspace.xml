@@ -2,10 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5ed4be77-804d-437f-9e99-8363385111ac" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ext_test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/src/test.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ext_train.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/train.sh" beforeDir="false" afterPath="$PROJECT_DIR$/src/train.sh" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -33,6 +31,15 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/prep.sh">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="498">
+              <caret line="43" column="4" selection-start-line="43" selection-start-column="4" selection-end-line="43" selection-end-column="4" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/preprocess.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="188">
@@ -44,27 +51,27 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/models/model_builder.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="180">
-              <caret line="26" column="12" selection-start-line="26" selection-start-column="12" selection-end-line="26" selection-end-column="12" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/src/train.sh">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="135">
-              <caret line="9" column="40" selection-start-line="9" selection-start-column="40" selection-end-line="9" selection-end-column="40" />
+            <state relative-caret-position="30">
+              <caret line="16" selection-start-line="16" selection-end-line="16" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/train.sh">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="90">
+              <caret line="6" selection-start-line="6" selection-end-line="6" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/README.md">
           <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
             <state split_layout="SPLIT">
-              <first_editor relative-caret-position="599">
-                <caret line="48" column="41" selection-start-line="48" selection-start-column="41" selection-end-line="48" selection-end-column="41" />
+              <first_editor relative-caret-position="150">
+                <caret line="9" column="3" lean-forward="true" selection-start-line="9" selection-start-column="3" selection-end-line="9" selection-end-column="3" />
               </first_editor>
               <second_editor />
             </state>
@@ -179,17 +186,17 @@
         <option value="$PROJECT_DIR$/src/etst.py" />
         <option value="$PROJECT_DIR$/src/remove_model_steps.py" />
         <option value="$PROJECT_DIR$/src/tester1.py" />
-        <option value="$PROJECT_DIR$/src/prep.sh" />
         <option value="$PROJECT_DIR$/src/post_process_bert.sh" />
         <option value="$PROJECT_DIR$/src/models/trainer_ext.py" />
         <option value="$PROJECT_DIR$/src/.gitignore" />
         <option value="$PROJECT_DIR$/src/models/data_loader.py" />
         <option value="$PROJECT_DIR$/src/preprocess.py" />
-        <option value="$PROJECT_DIR$/src/models/model_builder.py" />
         <option value="$PROJECT_DIR$/src/ext_test.sh" />
-        <option value="$PROJECT_DIR$/README.md" />
         <option value="$PROJECT_DIR$/src/test.sh" />
+        <option value="$PROJECT_DIR$/src/models/model_builder.py" />
         <option value="$PROJECT_DIR$/src/train.sh" />
+        <option value="$PROJECT_DIR$/src/prep.sh" />
+        <option value="$PROJECT_DIR$/README.md" />
       </list>
     </option>
   </component>
@@ -219,11 +226,6 @@
               <item name="SciPreSum" type="b2602c69:ProjectViewProjectNode" />
               <item name="SciPreSum" type="462c0819:PsiDirectoryNode" />
             </path>
-            <path>
-              <item name="SciPreSum" type="b2602c69:ProjectViewProjectNode" />
-              <item name="SciPreSum" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
-            </path>
           </expand>
           <select />
         </subPane>
@@ -231,7 +233,7 @@
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="SearchEverywhereHistoryKey" value="extte&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;model&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py&#10;pos&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;data&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;prep&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prep.sh&#10;tra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;train&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;trainextr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;exttes&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;ets&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;tokeni&#9;null&#9;null&#10;exttr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;extt&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;rouge&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;report&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;calculate_oracle_from_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;repo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;ca&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;pickm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;trainex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;modify_sent_labels_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;trai&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;exttra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;modi&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;change_labels_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;convert_bert_data_to_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/convert_bert_data_to_sequential.py&#10;calc&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;ta&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;traine&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;et&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;mmr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;trainer&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;ex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;pickmm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;posp&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;roug&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;rou&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;da&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;trainere&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;extr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;post&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;datalo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;sentbe&#9;null&#9;null&#10;mm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;pick&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;dat&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;cal&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;conver&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/bert_utils/convert_bert_data_to_sequential.py&#10;chan&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;mo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py" />
+    <property name="SearchEverywhereHistoryKey" value="prep&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prep.sh&#10;extte&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;model&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py&#10;pos&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;data&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;tra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;train&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;trainextr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;exttes&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;ets&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;tokeni&#9;null&#9;null&#10;exttr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;extt&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;rouge&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;report&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;calculate_oracle_from_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;repo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;ca&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;pickm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;trainex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;modify_sent_labels_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;trai&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;exttra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;modi&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;change_labels_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;convert_bert_data_to_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/convert_bert_data_to_sequential.py&#10;calc&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;ta&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;traine&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;et&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;mmr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;trainer&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;ex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;pickmm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;posp&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;roug&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;rou&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;da&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;trainere&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;extr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;post&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;datalo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;sentbe&#9;null&#9;null&#10;mm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;pick&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;dat&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;cal&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;conver&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/bert_utils/convert_bert_data_to_sequential.py&#10;chan&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;mo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py" />
     <property name="WebServerToolWindowFactoryState" value="true" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
@@ -628,14 +630,28 @@
       <option name="project" value="LOCAL" />
       <updated>1607998010076</updated>
     </task>
-    <option name="localTasksCounter" value="33" />
+    <task id="LOCAL-00033" summary="update bash scripts">
+      <created>1607998452748</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1607998452748</updated>
+    </task>
+    <task id="LOCAL-00034" summary="update prep script">
+      <created>1607998856223</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1607998856223</updated>
+    </task>
+    <option name="localTasksCounter" value="35" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="-15" y="37" width="1920" height="1002" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49701315" visible="true" weight="0.19755058" />
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49701315" visible="true" weight="0.19755058" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" sideWeight="0.50298685" side_tool="true" weight="0.15282215" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -649,7 +665,7 @@
       <window_info anchor="bottom" id="Version Control" order="8" weight="0.32967034" />
       <window_info active="true" anchor="bottom" id="File Transfer" order="9" visible="true" weight="0.26813188" />
       <window_info anchor="bottom" id="Database Changes" order="10" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Terminal" order="11" sideWeight="0.49946752" visible="true" weight="0.11758242" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="11" sideWeight="0.49946752" visible="true" weight="0.32637364" />
       <window_info anchor="bottom" id="Event Log" order="12" sideWeight="0.5005325" side_tool="true" weight="0.32967034" />
       <window_info anchor="bottom" id="Python Console" order="13" />
       <window_info anchor="bottom" id="Concurrent Activities Diagram" order="14" weight="0.32967034" />
@@ -736,7 +752,9 @@
     <MESSAGE value="updating readme" />
     <MESSAGE value="updating readme - changes in dataset section" />
     <MESSAGE value="updating readme - added prepared data section" />
-    <option name="LAST_COMMIT_MESSAGE" value="updating readme - added prepared data section" />
+    <MESSAGE value="update bash scripts" />
+    <MESSAGE value="update prep script" />
+    <option name="LAST_COMMIT_MESSAGE" value="update prep script" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1016,13 +1034,6 @@
     <entry file="file://$PROJECT_DIR$/src/run_prep.sh">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/prep.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="855">
-          <caret line="124" column="52" selection-start-line="124" selection-start-column="30" selection-end-line="124" selection-end-column="52" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/post_process_bert.sh">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="120">
@@ -1122,23 +1133,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/models/model_builder.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="26" column="12" selection-start-line="26" selection-start-column="12" selection-end-line="26" selection-end-column="12" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/README.md">
-      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-        <state split_layout="SPLIT">
-          <first_editor relative-caret-position="599">
-            <caret line="48" column="41" selection-start-line="48" selection-start-column="41" selection-end-line="48" selection-end-column="41" />
-          </first_editor>
-          <second_editor />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/test.sh">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="465">
@@ -1146,10 +1140,34 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/models/model_builder.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="16" selection-start-line="16" selection-end-line="16" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/train.sh">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="135">
-          <caret line="9" column="40" selection-start-line="9" selection-start-column="40" selection-end-line="9" selection-end-column="40" />
+        <state relative-caret-position="90">
+          <caret line="6" selection-start-line="6" selection-end-line="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/prep.sh">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="498">
+          <caret line="43" column="4" selection-start-line="43" selection-start-column="4" selection-end-line="43" selection-end-column="4" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor relative-caret-position="150">
+            <caret line="9" column="3" lean-forward="true" selection-start-line="9" selection-start-column="3" selection-end-line="9" selection-end-column="3" />
+          </first_editor>
+          <second_editor />
         </state>
       </provider>
     </entry>
