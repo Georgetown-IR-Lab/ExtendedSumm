@@ -51,9 +51,9 @@ Simply run the `prep.sh` bash script with providing the dataset directory. This 
 
 ### Training 
 The full training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at some items that you should probably change to fit in your needs:
-
+ 
 ```
-...
+... 
 
 DATA_PATH=/path/to/dataset/torch-files/
 MODEL_PATH=/path/to/saved/model/
