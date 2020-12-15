@@ -1,29 +1,49 @@
 #!/usr/bin/env bash
 
-DATA_PATH=/disk1/sajad/datasets/sci/pubmed-dataset//bert-files/512-whole/
-MODEL_PATH=/disk1/sajad/sci-trained-models/presum/pubmed-512-whole-sectioned-baseline-classi/
+################################################################################
+##### CHECKPOINTS –to train from ####### for pre-training purposes
+################################################################################
+# CHECKPOINT=/disk1/sajad/sci-trained-models/presum/arxiv-first-phase/model_step_30000.pt
+
+################################################################################
+##### Data #######
+################################################################################
+
+DATA_PATH=/disk1/sajad/datasets/sci/longsumm/bert-files/2500-segmented-seqLabelled-30/
+
+################################################################################
+##### MODEL #######
+################################################################################
+
+MODEL_PATH=/disk1/sajad/sci-trained-models/presum/LSUM-2500-segmented-sectioned-multi50-classi/
+
+################################################################################
+##### TRAINING SCRIPT #######
+################################################################################
+MAX_POS=2500
+BSZ=1
+export CUDA_VISIBLE_DEVICES=1
+
 LOG_DIR=../logs/$(echo $MODEL_PATH | cut -d \/ -f 6).log
 mkdir -p ../results/$(echo $MODEL_PATH | cut -d \/ -f 6)
 RESULT_PATH_TEST=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/
-MAX_POS=512
 
-export CUDA_VISIBLE_DEVICES=0,1
 
-python train.py -task ext \
+python3 train.py -task ext \
                 -mode train \
-                -model_name scibert \
+                -model_name longformer \
+                -val_pred_len 30 \
                 -bert_data_path $DATA_PATH \
                 -ext_dropout 0.1 \
                 -model_path $MODEL_PATH \
                 -lr 2e-3 \
                 -visible_gpus $CUDA_VISIBLE_DEVICES \
-                -val_pred_len 7 \
                 -report_every 50 \
                 -log_file $LOG_DIR \
-                -val_interval 3000 \
-                -save_checkpoint_steps 50000 \
-                -batch_size 5000 \
-                -test_batch_size 1000 \
+                -val_interval 1000 \
+                -save_checkpoint_steps 200000 \
+                -batch_size $BSZ \
+                -test_batch_size 5000 \
                 -max_length 600 \
                 -train_steps 200000 \
                 -alpha 0.95 \
@@ -31,4 +51,6 @@ python train.py -task ext \
                 -warmup_steps 10000 \
                 -max_pos $MAX_POS \
                 -result_path_test $RESULT_PATH_TEST \
-                -accum_count 2
+                -accum_count 2 \
+                -section_prediction \
+                -alpha_mtl 0.50

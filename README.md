@@ -46,7 +46,7 @@ This will uncompress the tar file into the current directory. The directory will
 
 ### Preparing data for BertsumExtMulti
 
-Simply run the `prep.sh` bash script with the providing the dataset directory. This script will use to functions to first create aggregated json files, and then preparing them for pretrained language models' usage. 
+Simply run the `prep.sh` bash script with providing the dataset directory. This script will use to functions to first create aggregated json files, and then preparing them for pretrained language models' usage. 
 
 
 ### Training 

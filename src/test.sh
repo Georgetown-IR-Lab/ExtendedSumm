@@ -29,8 +29,6 @@ mkdir -p ../results/$(echo $MODEL_PATH | cut -d \/ -f 6)
 for ST in test
 do
     RESULT_PATH=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/$ST
-#    RESULT_PATH=../results/$(echo $MODEL_PATH | cut -d \/ -f 6)/abs-set/$ST.official
-#    RESULT_PATH=/home/sajad/datasets/longsum/submission_files/
     python3 train.py -task ext \
                     -mode test \
                     -test_batch_size 3000 \
