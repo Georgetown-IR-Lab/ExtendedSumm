@@ -34,18 +34,15 @@ This will uncompress the tar file into the current directory. The directory will
 **FORMAT** Each file is a json object with keys (and structure) as below:
 
 
-- "id" _(String)_:  the paper ID
-- "abstract" _(String)_: the abstract text of the paper. This field is different from "gold" field for the datasets that have different ground-truth than the abstract. 
-- "gold"  _(List <List<>>)_: the ground-truth summary of the paper, where the innter list is the tokens associated with each gold summary sentence.
-- "sentences" _(List <List<>>)_: the source sentences of the full-text. The inner list contains 5 indeces, each of which represent different fields of the source sentence:
+- `"id" _(String)_`:  the paper ID
+- `"abstract" _(String)_`: the abstract text of the paper. This field is different from "gold" field for the datasets that have different ground-truth than the abstract. 
+- `"gold"  _(List <List<>>)_`: the ground-truth summary of the paper, where the innter list is the tokens associated with each gold summary sentence.
+- `"sentences" _(List <List<>>)_`: the source sentences of the full-text. The inner list contains 5 indeces, each of which represent different fields of the source sentence:
     * Index [0]: tokens of the sentences (i.e., list of tokens).
     * Index [1]: textual representation of the section that the sentence belongs to. 
     * Index [2]: RG-L score of the sentence with the gold summary.
     * Index [3]: textual representation of the sentences.
     * Index [4]: oracle label associated with the sentence (0, or 1). 
-
-
-
 
 ### Training 
 Now the is the time to train the extractive model. The training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
@@ -136,7 +133,7 @@ do
 done
  ```
 
-## Citation
+### Citation
 
 If you plan to use this work, please cite the following papers:
 
