@@ -49,7 +49,6 @@ do
                     -test_from $CHECKPOINT \
                     -model_name longformer \
                     -val_pred_len 30 \
-                    -saved_list_name save_lists/lsum-$ST-longformer-multi50-aftersdu.p \
                     -section_prediction \
                     -alpha_mtl 0.50
 done
