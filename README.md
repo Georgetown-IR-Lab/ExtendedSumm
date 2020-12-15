@@ -14,7 +14,7 @@ conda env create -f environment.yml
 ## How to run...
 
 **IMPORTANT:** The following commands should be run under `src/` directory.
-
+ 
 ### Dataset
 
 To start with, you first need to download the datasets that are intended to work with the code base. You can download them from following links: 
