@@ -11,18 +11,20 @@ To install the required packages, please run conda yml file that you find in the
 conda env create -f environment.yml
 ```
 
-# How to run...
+## How to run...
 
 **IMPORTANT:** The following commands should be run under `src/` directory.
 
-## Dataset
+### Dataset
 
-To start with, you first need to download the datasets that are intended to work with the code base. Use the following command to downlaod the datasets. 
+To start with, you first need to download the datasets that are intended to work with the code base. You can download them from following links: 
 
-```
-python dl_dataset.py -dataset pubmed -destination $DESTINATION_FILE
-```
-Note that `$DESTINATION_FILE` is the directory to tar file, so you have to specify it. For example `$DESTINATION_FILE` can be  `/disk/sajad/datasets/sci/pubmed.tar.gz`
+| Dataset  | Download Link |
+| -------- | ------------- |
+| arXiv-Long  | [Download]()  |
+| PubMed-Long  | [Download]() |
+
+
 
 After downloading the dataset, you will need to uncompress it using the following command:
 
@@ -32,6 +34,7 @@ tar -xvf pubmed.tar.gz
 This will uncompress the tar file into the current directory. The directory will include the single json files of different sets including training, validation, and test. 
 
 **FORMAT** Each file is a json object with keys (and structure) as below:
+
 
 - "id" _(String)_:  the paper ID
 - "abstract" _(String)_: the abstract text of the paper. This field is different from "gold" field for the datasets that have different ground-truth than the abstract. 
@@ -46,7 +49,7 @@ This will uncompress the tar file into the current directory. The directory will
 
 
 
-## Training 
+### Training 
 Now the is the time to train the extractive model. The training scripts are inside `train.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
 
 ```
@@ -88,7 +91,7 @@ python train.py -task ext \
                 -accum_count 2
  ```
 
-## Inference 
+### Inference 
 The inference scripts are inside `test.sh` bash file. To run it on your own machine, let's take a look at the items that you should probably change to fit in your needs:
 
 ```
