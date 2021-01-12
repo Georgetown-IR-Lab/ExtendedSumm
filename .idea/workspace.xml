@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="5ed4be77-804d-437f-9e99-8363385111ac" name="Default Changelist" comment="" />
+    <list default="true" id="5ed4be77-804d-437f-9e99-8363385111ac" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/prep.sh" beforeDir="false" afterPath="$PROJECT_DIR$/src/prep.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/prepro/data_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/prepro/data_builder.py" afterDir="false" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,56 +34,29 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/prep.sh">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="498">
-              <caret line="43" column="4" selection-start-line="43" selection-start-column="4" selection-end-line="43" selection-end-column="4" />
+            <state relative-caret-position="281">
+              <caret line="26" column="5" lean-forward="true" selection-start-line="16" selection-start-column="15" selection-end-line="26" selection-end-column="5" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/preprocess.py">
+        <entry file="file://$PROJECT_DIR$/src/prepro/data_builder.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="188">
-              <caret line="40" selection-start-line="40" selection-end-line="40" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/models/model_builder.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="30">
-              <caret line="16" selection-start-line="16" selection-end-line="16" />
+            <state relative-caret-position="437">
+              <caret line="613" column="29" lean-forward="true" selection-start-line="613" selection-start-column="29" selection-end-line="613" selection-end-column="29" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/README.md">
-          <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-            <state split_layout="SPLIT">
-              <first_editor relative-caret-position="-537">
-                <caret line="16" column="1" selection-start-line="16" selection-start-column="1" selection-end-line="16" selection-end-column="1" />
-              </first_editor>
-              <second_editor />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/train.sh">
+        <entry file="file://$PROJECT_DIR$/split_relable.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="90">
-              <caret line="6" selection-start-line="6" selection-end-line="6" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/test.sh">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="468">
-              <caret line="51" selection-start-line="51" selection-end-line="51" />
+            <state relative-caret-position="135">
+              <caret line="9" column="38" selection-start-line="9" selection-start-column="38" selection-end-line="9" selection-end-column="38" />
+              <folding>
+                <element signature="e#0#11#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -95,9 +72,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>top-sents</find>
-      <find>extract_top_sents</find>
-      <find>valid_rgls</find>
       <find>min_rl</find>
       <find>best_model_saved</find>
       <find>set_rl</find>
@@ -125,6 +99,9 @@
       <find>pick_top</find>
       <find>p_sent_numbers</find>
       <find>sent_numbers_whole</find>
+      <find>rg_score</find>
+      <find>sent_rg_scores</find>
+      <find>out_sents_rg_scores</find>
     </findStrings>
     <dirStrings>
       <dir>$PROJECT_DIR$/src</dir>
@@ -143,8 +120,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/src/sections_bertsum.csv" />
-        <option value="$PROJECT_DIR$/src/sections_multi_0.05.csv" />
         <option value="$PROJECT_DIR$/src/sections_multi_0.1.csv" />
         <option value="$PROJECT_DIR$/src/sections_multi_0.2.csv" />
         <option value="$PROJECT_DIR$/src/mmr_outputs/sections_bertsum.csv" />
@@ -176,7 +151,6 @@
         <option value="$PROJECT_DIR$/src/modify_sent_labels_bertfiles.py" />
         <option value="$PROJECT_DIR$/src/models/reporter_ext.py" />
         <option value="$PROJECT_DIR$/src/calculate_oracle_from_bertfiles.py" />
-        <option value="$PROJECT_DIR$/src/prepro/data_builder.py" />
         <option value="$PROJECT_DIR$/src/utils/rouge_utils.py" />
         <option value="$PROJECT_DIR$/src/ext_train.sh" />
         <option value="$PROJECT_DIR$/src/counting.py" />
@@ -191,9 +165,12 @@
         <option value="$PROJECT_DIR$/src/ext_test.sh" />
         <option value="$PROJECT_DIR$/src/models/model_builder.py" />
         <option value="$PROJECT_DIR$/src/train.sh" />
-        <option value="$PROJECT_DIR$/src/prep.sh" />
         <option value="$PROJECT_DIR$/src/test.sh" />
         <option value="$PROJECT_DIR$/README.md" />
+        <option value="$PROJECT_DIR$/src/prep.sh" />
+        <option value="$PROJECT_DIR$/src/prepro/data_builder.py" />
+        <option value="$PROJECT_DIR$/src/splits_relabel.py" />
+        <option value="$PROJECT_DIR$/split_relable.py" />
       </list>
     </option>
   </component>
@@ -204,8 +181,7 @@
     <sorting>DEFINITION_ORDER</sorting>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="-15" />
-    <option name="y" value="37" />
+    <option name="y" value="23" />
     <option name="width" value="1920" />
     <option name="height" value="1002" />
   </component>
@@ -215,7 +191,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -223,14 +198,20 @@
               <item name="SciPreSum" type="b2602c69:ProjectViewProjectNode" />
               <item name="SciPreSum" type="462c0819:PsiDirectoryNode" />
             </path>
+            <path>
+              <item name="SciPreSum" type="b2602c69:ProjectViewProjectNode" />
+              <item name="SciPreSum" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+            </path>
           </expand>
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="SearchEverywhereHistoryKey" value="prep&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prep.sh&#10;extte&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;model&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py&#10;pos&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;data&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;tra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;train&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;trainextr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;exttes&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;ets&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;tokeni&#9;null&#9;null&#10;exttr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;extt&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;rouge&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;report&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;calculate_oracle_from_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;repo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;ca&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;pickm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;trainex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;modify_sent_labels_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;trai&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;exttra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;modi&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;change_labels_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;convert_bert_data_to_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/convert_bert_data_to_sequential.py&#10;calc&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;ta&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;traine&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;et&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;mmr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;trainer&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;ex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;pickmm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;posp&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;roug&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;rou&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;da&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;trainere&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;extr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;post&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;datalo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;sentbe&#9;null&#9;null&#10;mm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;pick&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;dat&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;cal&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;conver&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/bert_utils/convert_bert_data_to_sequential.py&#10;chan&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;mo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py" />
+    <property name="SearchEverywhereHistoryKey" value="prep&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prep.sh&#10;trainere&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;extte&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;model&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py&#10;pos&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;data&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;tra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;train&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train.py&#10;trainextr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;exttes&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;ets&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;tokeni&#9;null&#9;null&#10;exttr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;extt&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;rouge&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;report&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;calculate_oracle_from_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;repo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/reporter_ext.py&#10;ca&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;pickm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;trainex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/train_extractive.py&#10;modify_sent_labels_bertfiles&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;trai&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;exttra&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;modi&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/modify_sent_labels_bertfiles.py&#10;change_labels_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;convert_bert_data_to_sequential&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/convert_bert_data_to_sequential.py&#10;calc&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;ta&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;traine&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;et&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/etst.py&#10;mmr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;trainer&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/trainer_ext.py&#10;ex&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_test.sh&#10;pickmm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;posp&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;roug&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;rou&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/utils/rouge_utils.py&#10;da&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/prepro/data_builder.py&#10;extr&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/ext_train.sh&#10;post&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/post_process_bert.sh&#10;datalo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;sentbe&#9;null&#9;null&#10;mm&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/mmr_run.sh&#10;pick&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/pick_mmr.py&#10;dat&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/data_loader.py&#10;cal&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/calculate_oracle_from_bertfiles.py&#10;conver&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/bert_utils/convert_bert_data_to_sequential.py&#10;chan&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/change_labels_sequential.py&#10;mo&#9;FILE&#9;file:///Users/ss4164/PycharmProjects/SciPreSum/src/models/model_builder.py" />
     <property name="WebServerToolWindowFactoryState" value="true" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
@@ -669,13 +650,28 @@
       <option name="project" value="LOCAL" />
       <updated>1608006152408</updated>
     </task>
-    <option name="localTasksCounter" value="39" />
+    <task id="LOCAL-00039" summary="added pubmed-long download link">
+      <created>1608006335829</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1608006335829</updated>
+    </task>
+    <task id="LOCAL-00040" summary="updates on readme">
+      <created>1608045356107</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1608045356108</updated>
+    </task>
+    <option name="localTasksCounter" value="41" />
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-15" y="37" width="1920" height="1002" extended-state="0" />
+    <frame x="0" y="23" width="1920" height="1002" extended-state="0" />
+    <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49701315" visible="true" weight="0.19755058" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49701315" visible="true" weight="0.2827476" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" sideWeight="0.50298685" side_tool="true" weight="0.15282215" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -687,9 +683,9 @@
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
       <window_info anchor="bottom" id="Version Control" order="8" weight="0.32967034" />
-      <window_info active="true" anchor="bottom" id="File Transfer" order="9" visible="true" weight="0.26813188" />
+      <window_info anchor="bottom" id="File Transfer" order="9" visible="true" weight="0.26813188" />
       <window_info anchor="bottom" id="Database Changes" order="10" show_stripe_button="false" />
-      <window_info active="true" anchor="bottom" id="Terminal" order="11" sideWeight="0.49946752" visible="true" weight="0.56813186" />
+      <window_info anchor="bottom" id="Terminal" order="11" sideWeight="0.49946752" weight="0.2725275" />
       <window_info anchor="bottom" id="Event Log" order="12" sideWeight="0.5005325" side_tool="true" weight="0.32967034" />
       <window_info anchor="bottom" id="Python Console" order="13" />
       <window_info anchor="bottom" id="Concurrent Activities Diagram" order="14" weight="0.32967034" />
@@ -753,7 +749,6 @@
     <option name="myLimit" value="2678400000" />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Creating single-task branch" />
     <MESSAGE value="Updating test module in trainer_ext.py to produce long summaries by concatenating each segments sentences." />
     <MESSAGE value="Back to master: producing summaries by taking into account the entire sentence scores computed on segments." />
     <MESSAGE value="Add multitasked section prediction capability" />
@@ -778,7 +773,8 @@
     <MESSAGE value="update prep script" />
     <MESSAGE value="update dataset section" />
     <MESSAGE value="added pubmed-long download link" />
-    <option name="LAST_COMMIT_MESSAGE" value="added pubmed-long download link" />
+    <MESSAGE value="updates on readme" />
+    <option name="LAST_COMMIT_MESSAGE" value="updates on readme" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -841,23 +837,6 @@
     </expressions>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/src/csv_files/train_papers_sect8.csv">
-      <provider editor-type-id="csv-table-editor">
-        <state showInfoPanel="true" fixedHeaders="false" rowLines="3" />
-      </provider>
-      <provider selected="true" editor-type-id="csv-text-editor">
-        <state relative-caret-position="826">
-          <caret line="333" column="13" selection-start-line="333" selection-start-column="13" selection-end-line="333" selection-end-column="13" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/sent_bert.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="135">
-          <caret line="9" column="28" selection-start-line="9" selection-start-column="24" selection-end-line="9" selection-end-column="28" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/utils/rouge_score.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="578">
@@ -908,73 +887,16 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/mmr_outputs/results_LSUM-test-longformer-bertsum.p.csv">
-      <provider editor-type-id="csv-table-editor">
-        <state showInfoPanel="true" fixedHeaders="false" rowLines="3" />
-      </provider>
-      <provider selected="true" editor-type-id="csv-text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/mmr_outputs/results_arxivL-test-sectioned-multi.p.csv">
-      <provider editor-type-id="csv-table-editor">
-        <state showInfoPanel="true" fixedHeaders="false" rowLines="3" />
-      </provider>
-      <provider selected="true" editor-type-id="csv-text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/mmr_outputs/results_arxivL-test-sectioned-bertsum.p.csv">
-      <provider editor-type-id="csv-table-editor">
-        <state showInfoPanel="true" fixedHeaders="false" rowLines="3" />
-      </provider>
-      <provider selected="true" editor-type-id="csv-text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/pick_mmr_anal.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="237">
-          <caret line="458" column="4" selection-start-line="458" selection-start-column="4" selection-end-line="458" selection-end-column="4" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/mmr_run.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="198">
-          <caret line="158" column="19" selection-start-line="158" selection-start-column="19" selection-end-line="158" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/convert_bert_data_to_sequential.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="703">
-          <caret line="77" lean-forward="true" selection-start-line="77" selection-end-line="77" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/change_labels_sequential.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="71">
-          <caret line="179" lean-forward="true" selection-start-line="179" selection-end-line="179" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/modify_sent_labels_bertfiles.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="355">
-          <caret line="267" column="113" selection-start-line="267" selection-start-column="113" selection-end-line="267" selection-end-column="113" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/pick_mmr.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="6874">
-          <caret line="716" column="25" selection-start-line="711" selection-start-column="24" selection-end-line="716" selection-end-column="25" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/pick_top_sents.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="75">
-          <caret line="10" column="24" selection-start-line="10" selection-start-column="24" selection-end-line="10" selection-end-column="24" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/mmr_outputs/results_LSUM-test-longformer-bertsum.p.csv" />
+    <entry file="file://$PROJECT_DIR$/src/mmr_outputs/results_arxivL-test-sectioned-multi.p.csv" />
+    <entry file="file://$PROJECT_DIR$/src/mmr_outputs/results_arxivL-test-sectioned-bertsum.p.csv" />
+    <entry file="file://$PROJECT_DIR$/src/pick_mmr_anal.py" />
+    <entry file="file://$PROJECT_DIR$/src/mmr_run.sh" />
+    <entry file="file://$PROJECT_DIR$/src/convert_bert_data_to_sequential.py" />
+    <entry file="file://$PROJECT_DIR$/src/change_labels_sequential.py" />
+    <entry file="file://$PROJECT_DIR$/src/modify_sent_labels_bertfiles.py" />
+    <entry file="file://$PROJECT_DIR$/src/pick_mmr.py" />
+    <entry file="file://$PROJECT_DIR$/src/pick_top_sents.py" />
     <entry file="file://$PROJECT_DIR$/src/models/reporter_ext.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="528">
@@ -982,13 +904,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/calculate_oracle_from_bertfiles.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-185">
-          <caret line="67" column="57" selection-start-line="67" selection-start-column="57" selection-end-line="67" selection-end-column="76" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/calculate_oracle_from_bertfiles.py" />
     <entry file="file://$PROJECT_DIR$/src/utils/rouge_utils.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="6300">
@@ -996,20 +912,8 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/etst.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2730">
-          <caret line="186" column="128" selection-start-line="186" selection-start-column="128" selection-end-line="186" selection-end-column="128" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/remove_model_steps.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="7" column="28" selection-start-line="7" selection-start-column="28" selection-end-line="7" selection-end-column="28" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/etst.py" />
+    <entry file="file://$PROJECT_DIR$/src/remove_model_steps.py" />
     <entry file="file://$PROJECT_DIR$/src/others/tokenization.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="330">
@@ -1017,13 +921,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/tester1.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="300">
-          <caret line="7" column="44" selection-start-line="7" selection-start-column="44" selection-end-line="7" selection-end-column="44" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/tester1.py" />
     <entry file="file://$PROJECT_DIR$/src/train_extractive.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="206">
@@ -1031,40 +929,14 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/counting.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="420">
-          <caret line="28" selection-start-line="28" selection-end-line="28" />
-          <folding>
-            <element signature="e#0#11#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/json_to_txt.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="30">
-          <caret line="2" column="46" selection-start-line="2" selection-start-column="46" selection-end-line="2" selection-end-column="46" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/sect_infos.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <caret lean-forward="true" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/run_prep.sh">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/counting.py" />
+    <entry file="file://$PROJECT_DIR$/src/json_to_txt.py" />
+    <entry file="file://$PROJECT_DIR$/src/sect_infos.py" />
+    <entry file="file://$PROJECT_DIR$/src/run_prep.sh" />
     <entry file="file://$PROJECT_DIR$/src/post_process_bert.sh">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="120">
           <caret line="8" column="2" selection-start-line="8" selection-start-column="2" selection-end-line="8" selection-end-column="2" />
-          <folding>
-            <marker date="1607551927550" expanded="true" signature="743:1594" ph="..." />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -1075,27 +947,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/models/trainer_ext.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1938">
-          <caret line="818" column="51" selection-start-line="818" selection-start-column="51" selection-end-line="818" selection-end-column="51" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/.gitignore">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="45">
           <caret line="3" column="34" selection-start-line="3" selection-start-column="34" selection-end-line="3" selection-end-column="34" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/prepro/data_builder.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="833">
-          <caret line="724" selection-start-line="724" selection-end-line="724" />
         </state>
       </provider>
     </entry>
@@ -1106,42 +961,13 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/lr.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <folding>
-            <element signature="e#0#11#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/lr.py" />
     <entry file="file://$PROJECT_DIR$/src/dl_dataset.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <folding>
-            <element signature="e#0#15#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/post_stats.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-547">
-          <folding>
-            <element signature="e#0#15#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/train_abstractive.py">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/preprocess.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="188">
-          <caret line="40" selection-start-line="40" selection-end-line="40" />
-        </state>
-      </provider>
+    <entry file="file://$PROJECT_DIR$/src/post_stats.py" />
+    <entry file="file://$PROJECT_DIR$/src/train_abstractive.py">
+      <provider selected="true" editor-type-id="text-editor" />
     </entry>
     <entry file="file://$PROJECT_DIR$/src/prepro/smart_common_words.txt">
       <provider selected="true" editor-type-id="text-editor" />
@@ -1157,10 +983,34 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/prep.sh">
+    <entry file="file://$PROJECT_DIR$/src/test.sh">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="498">
-          <caret line="43" column="4" selection-start-line="43" selection-start-column="4" selection-end-line="43" selection-end-column="4" />
+        <state relative-caret-position="765">
+          <caret line="51" selection-start-line="51" selection-end-line="51" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/train.sh">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="255">
+          <caret line="17" column="94" selection-start-line="17" selection-start-column="94" selection-end-line="17" selection-end-column="94" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor relative-caret-position="816">
+            <caret line="96" selection-start-line="96" selection-end-line="96" />
+          </first_editor>
+          <second_editor />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/preprocess.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="540">
+          <caret line="40" selection-start-line="40" selection-end-line="40" />
         </state>
       </provider>
     </entry>
@@ -1171,27 +1021,44 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/test.sh">
+    <entry file="file://$PROJECT_DIR$/src/models/trainer_ext.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="468">
-          <caret line="51" selection-start-line="51" selection-end-line="51" />
+        <state relative-caret-position="833">
+          <caret line="514" selection-start-line="514" selection-end-line="514" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/train.sh">
+    <entry file="file://$PROJECT_DIR$/src/prep.sh">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="6" selection-start-line="6" selection-end-line="6" />
+        <state relative-caret-position="281">
+          <caret line="26" column="5" lean-forward="true" selection-start-line="16" selection-start-column="15" selection-end-line="26" selection-end-column="5" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/README.md">
-      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
-        <state split_layout="SPLIT">
-          <first_editor relative-caret-position="-537">
-            <caret line="16" column="1" selection-start-line="16" selection-start-column="1" selection-end-line="16" selection-end-column="1" />
-          </first_editor>
-          <second_editor />
+    <entry file="file://$PROJECT_DIR$/src/splits_relabel.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" lean-forward="true" selection-start-line="2" selection-end-line="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/prepro/data_builder.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="437">
+          <caret line="613" column="29" lean-forward="true" selection-start-line="613" selection-start-column="29" selection-end-line="613" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/split_relable.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="135">
+          <caret line="9" column="38" selection-start-line="9" selection-start-column="38" selection-end-line="9" selection-end-column="38" />
+          <folding>
+            <element signature="e#0#11#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
