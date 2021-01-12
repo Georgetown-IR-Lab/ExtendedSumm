@@ -14,17 +14,17 @@ echo "Starting to write aggregated json files..."
 echo "-----------------"
 
 
-#for SET in val
-#do
-#    python3 preprocess.py -mode format_longsum_to_lines \
-#                        -save_path $SAVE_JSON  \
-#                        -n_cpus 24 \
-#                        -keep_sect_num \
-#                        -shard_size 150 \
-#                        -log_file ../logs/preprocess.log \
-#                        -raw_path $RAW_PATH/$SET/ \
-#                        -dataset $SET
-#done
+for SET in val
+do
+    python3 preprocess.py -mode format_longsum_to_lines \
+                        -save_path $SAVE_JSON  \
+                        -n_cpus 24 \
+                        -keep_sect_num \
+                        -shard_size 150 \
+                        -log_file ../logs/preprocess.log \
+                        -raw_path $RAW_PATH/$SET/ \
+                        -dataset $SET
+done
 
 echo "-----------------"
 echo "Now starting to write torch files..."

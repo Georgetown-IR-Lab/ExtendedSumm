@@ -21,7 +21,7 @@ To start with, you first need to download the datasets that are intended to work
 
 | Dataset  | Download Link |
 | :-------- | :-------- |
-| arXiv-Long  |  [Download](https://drive.google.com/file/d/1p1lb-Urcpds1Bo9piEYwi1DKS9aXxtIv/view?usp=sharing)  |
+| arXiv-Long  |  [Download](https://drive.google.com/file/d/1gXTgjFxUw9OxaXFgkUzB5M0NOaL0oVgR/view?usp=sharing)  |
 | PubMed-Long  | [Download](https://drive.google.com/file/d/1T5xbzE_Y_kfxAPzROVbjTz4L_FFQ9EEu/view?usp=sharing) |
 
 After downloading the dataset, you will need to uncompress it using the following command:
@@ -43,10 +43,14 @@ This will uncompress the `pubmedL` tar file into the current directory. The dire
     * Index [2]: Rouge-L score of the sentence with the gold summary.
     * Index [3]: textual representation of the sentences.
     * Index [4]: oracle label associated with the sentence (0, or 1). 
+    * Index [5]: the section id assigned by sequential sentence classification package. For more information, please refer to [this repository](https://github.com/allenai/sequential_sentence_classification)
+    
 
 ### Preparing Data
 
 Simply run the `prep.sh` bash script with providing the dataset directory. This script will use two functions to first create aggregated json files, and then preparing them for pretrained language models' usage. 
+
+Please note that if you want to use your custom dataset and create torch files, you will need to frame the format of your dataset to the given format in the Dataset section.
 
 
 ### Training 
