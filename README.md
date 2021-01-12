@@ -1,5 +1,5 @@
 # ExtendedSumm
-This repository contains the implementation details and datasets used in _[On Generating Extended Summaries of Long Documents](http://ir.cs.georgetown.eud)_ paper at the AAAI-21 Workshop on Scientific Document Understanding (SDU 2021).
+This repository contains the implementation details and datasets used in _[On Generating Extended Summaries of Long Documents](https://arxiv.org/pdf/2012.14136.pdf)_ paper at the AAAI-21 Workshop on Scientific Document Understanding (SDU 2021).
 
 
 
